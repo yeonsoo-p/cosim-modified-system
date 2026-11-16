@@ -1,0 +1,136 @@
+====================================================================================================
+SCOPE of the formalisation: the standard, the form of the statements, and what is outside
+====================================================================================================
+
+------------------------------------------- The standard -------------------------------------------
+
+The library CoSimFoundations is written in Lean 4, toolchain leanprover/lean4:v4.35.0
+(file lean-toolchain), with Mathlib at the tag v4.35.0, commit
+56a005855ea17e0b0958f73ec801ae140b0a1679 (file lake-manifest.json). It has 120 modules in the folder
+CoSimFoundations, with 1,784 theorems and 250 definitions and structures in 35,394 lines; the root
+file CoSimFoundations.lean imports all of them. The library imports Mathlib and nothing else: every
+import line of the 120 modules, of the root file and of the audit file names a module of Mathlib or
+of the library itself. It contains no unproved step and declares no axiom: a search of these 122
+files for the words sorry, admit, native_decide, axiom, unsafe, opaque, implemented_by, extern and
+set_option, as whole words in code and comments, finds none of them. The library is compiled with
+autoImplicit switched off and with warnings treated as errors (lakefile.toml), so that a declaration
+that uses sorry would stop the build.
+
+The audit. CoSimFoundationsAudit.lean imports the library and consists of 1,622 lines of the form
+"#print axioms CoSimFoundations.name", one for each audited theorem by its fully qualified name.
+When the file is built, Lean prints for each of them the axioms on which its proof depends, through
+all lemmas that it uses. The standard is met if the build ends without an error and every printed
+list contains only propext, Classical.choice and Quot.sound, the three standard axioms of Lean. The
+162 theorems that the audit does not list are lemmas, nine of them private; the text search above
+covers them as well, and CORRESPONDENCE.txt marks with "(+)" those that it cites.
+
+To build, in this folder: "lake exe cache get" downloads the compiled Mathlib, and "lake build" then
+builds the two default targets, the library and the audit. A Lean process that imports Mathlib needs
+several gigabytes of memory, and lake runs several at once; on a machine with little memory the
+modules can be built one at a time, for example "lake build CoSimFoundations.Setting", and the audit
+last with "lake build CoSimFoundationsAudit".
+
+------------------------------------ The form of the statements ------------------------------------
+
+The statements are stated for operators on real normed or inner product spaces, or for real matrices
+with a block pattern (the structure HeldScheme: the matrices F, G^new C, G^old C and X on states
+that a map groups into subsystems, with a partner relation and stages). They do not assume
+power-conjugate ports unless the statement of the paper does.
+
+Statements that the paper makes to leading order, with a remainder O(H^p), are formalised at one
+macro step with an explicit bound on the remainder, for every scheme whose ||G^new C|| and ||X - I||
+are bounded by given multiples a H and b H and whose ||X - U|| is bounded by a given multiple c H^2.
+Nothing is assumed of a family of schemes, and the constants of the remainders are explicit
+functions of a, b, c and ||A||. The zero-order hold is proved to satisfy the three bounds for
+H ||A|| <= 1/4 and s H ||A|| <= 1/6, with s the square root of the number of subsystems and
+constants in ||A|| and s. For example, the zero-order hold has ||Delta - (1/2) H A_sig
+A|| <= (37 + 220 s + 53 s^2 + 54 s^3) ||A||^3 H^2 for 0 < H, H ||A|| <= 1/24 and s H ||A|| <= 1/6.
+The modified system is the logarithm series of X divided by H; it exists for ||X - I|| < 1, and the
+statements about it are formalised for ||X - I|| <= 1/3 and H ||A|| <= 1/4.
+
+The following hypotheses, which the paper leaves to its standing assumptions, are explicit in the
+Lean statements: an invertible phi in (10) and wherever Psi_0, E or Q occur
+(proved for H ||A_0|| <= 1); H != 0 or H > 0 where a statement divides by H; integer offsets in
+(16); surjective outputs of the partners, given by right inverses, in (23); in Theorem 4.4 (i), in
+Theorem 4.5 (i) and in (42) a bounded right inverse of the stacked maps, on which the constants
+depend, with H ||A_i|| <= 1 and a smallness condition on H times the norm of that inverse, and
+H <= 1 in the last two; in Theorem 4.5 (ii) the constant 2 b of Lemma A.1 in the place of 5.3;
+0 <= H and l >= 1 in Lemma A.1; distinct stages for the determinant of Proposition 5.1; B and L
+given as data in the form of (31) at the ports, which holds for every interconnection L; that a
+subsystem is not its own partner in the statements on a diagonal block. The injection rate and the
+added damping enter as arbitrary bounds of the quadratic form of Delta_R and not as eigenvalues. The
+largest relative error of Theorem 4.5 and Lemma A.1 enters as an arbitrary upper bound of the
+relative errors of all runs. The asymptotic part of Corollary 3.4 is stated as a condition on the
+eigenvalues.
+
+-------------------------------- What is outside the formalisation ---------------------------------
+
+CORRESPONDENCE.txt gives the status of every numbered statement and equation. Of the numbered
+statements and their parts, the following are not formalised, or are formalised in a special case
+only.
+
+  - Section 2. In (1) and (2): the subsystems with their matrices B_i, C_j as objects and the block
+    structure A_ij = B_i L_ij C_j; the library takes a matrix A with the block pattern. In
+    Definition 2.1 (i) to (iii): weights that depend on the local time, and the derivation of the
+    coefficients from the differential equations for subsystems with several states. In Definition
+    2.2: the condition on the eigenvalues, that the logarithm series is the principal logarithm, and
+    the uniqueness of the modified system. In (8): that sym A is block diagonal, as a declaration.
+    Example 2.3.
+  - Section 3. In Lemma 3.1: the closed form of Psi_0 with its expansion, and (11) as a differential
+    equation. In Remark 3.2: the second order of the alternating scheme in its numerical
+    dissipation, and its identification with the Strang splitting. Remark 3.3 with (14). In
+    Corollary 3.4: the part on stability that is not asymptotic, and the Jordan chains, since the
+    library has no Jordan form. In Corollary 3.5: that the eigenvalues of the modified system are
+    even in H.
+  - Section 4. In Theorem 4.2: the identity T_i v = Pi_i U v on the states not shown as a
+    declaration of its own (its consequence for the norm is formalised). (24) for subsystems with
+    more than one state. Example 4.3. (26) on the states that a subsystem is shown. In Theorem 4.4
+    (ii): the printed form, which follows from the formalised one by a division. In Theorem 4.5: the
+    last sentence, on one held sample, as one statement.
+  - Section 5. In Proposition 5.1: the determinant, and nu = 0, when two subsystems that are not
+    partners share a stage. In Lemma 5.2: that equality holds in (34) for one pair, and that a pair
+    in the state spaces of two subsystems attains the norm of the block. In Corollary 5.4 (ii): the
+    characterisation by proper interval graphs, which rests on a cited theorem of graph theory; the
+    path executed from end to end is formalised. In Proposition 5.5: Delta_R = 0 and that the
+    difference is a numerical interconnection, for ||X - I|| > 1/3. Example 5.6. In Proposition 5.7:
+    the size O(H^3 |x^k|^2) of the term with skew Psi_0, its vanishing when some A_i are symmetric
+    and others skew, and that the second term of (37) is absent only if no two partners share a
+    stage.
+  - Section 6. In Proposition 6.1: the two inequalities that follow (38). Example 6.2.
+
+Statements of the running text have a row in CORRESPONDENCE.txt where the library has a declaration
+for them. Of the running text, the following are outside the formalisation.
+
+  - Section 2.2: the scheme of the class that holds a sample with feedthrough of a partner; that a
+    local gain realises every F_i > 0 and every G_ij for a scalar store in an arbitrary order of
+    execution (formalised for a Jacobi scheme and for one sequential order).
+  - Section 2.3: that a modified system exists only if X has no eigenvalue on the half line from
+    minus infinity to 0, and that Delta = 0 only if X = U; the modified system of a scheme with
+    several held samples and its parasitic eigenvalues.
+  - Section 2.4: the derivative of the energy along the modified system; for a lossless system, that
+    conservation of the energy implies Delta_R = 0 when ||X - I|| > 1/3; H nu = -ln det D, and the
+    leading values of s_+ and s_-.
+  - Section 3.1: the relation between the pair and the modified system through the hyperbolic
+    tangent, and Ehat^(-1) Ahat = At + O(H^2); the values of H for which Psi_0 is defined.
+  - Section 3.2: the macro step at which a mode of the Jacobi hold loses its damping; the frequency
+    of the leapfrog method; that a link within a stage and a cycle with unequal numbers of links to
+    a later and to an earlier stage have no offsets.
+  - Section 4.1 and Section 4.2: the formula for f_i and the bound on c_i for scalar stores; the
+    exact rule with two held samples on the lossless chain of three; the rule of fourth order from
+    two held samples of an output and of its rate.
+  - Section 5.1: that the block of sym(A_sig A) between two partners vanishes between the states
+    that the two outputs do not show (the cancellation is formalised with the coefficient row as a
+    hypothesis).
+  - Section 5.2: that the largest entry of Delta_R between two orthogonal states attains half the
+    spread mu + iota; tau_k = (p_i - 2 p_k + p_j)/2 with offsets; that A_ik A_kj vanishes if the two
+    ports of the common partner act in orthogonal directions.
+  - Section 5.3: the star with three leaves and the ring; the damped sweep as a splitting.
+  - Section 5.4: x^T A_seq x at the ports; the modified Hamiltonian of the symplectic Euler method
+    for two stores; N + N^T = H A_seq for the zero-order hold, which the bound (1 + rho)/(1 - rho)
+    on the energy needs; the threshold H lambda_max(A_seq) = 2; the statement on coupling graphs
+    with a cycle.
+  - Section 7.1: that a Jacobi scheme with the first-order input has X - U = O(H^3).
+  - Appendix A.3: skew Psi_0 = (1/12) H^2 skew(A_0^2) + O(H^4).
+
+Example 2.3, Example 4.3, Example 5.6, Example 6.2, the numbers of the two tables and the numbers of
+the figures are computed, not proved; the code that computes them is published with the library.

@@ -1,0 +1,1568 @@
+====================================================================================================
+CORRESPONDENCE between the statements of the paper and the Lean library CoSimFoundations
+====================================================================================================
+
+This file gives, for every numbered statement of the paper (definitions, lemmas, theorems,
+corollaries, propositions, remarks, examples) and for every numbered equation, the Lean declarations
+that formalise it and a status. The rows stand in the order of the paper. A statement with several
+parts has one row for each part. Statements of the running text have a row where the library has a
+declaration for them; they carry the label "(text)". The numbers are those printed in the paper; the
+labels are those of its LaTeX source, by which the headers of the Lean modules name the statements.
+The standard of the formalisation and the list of what is outside it are in SCOPE.txt.
+
+Lean names are relative to the namespace CoSimFoundations and are followed by nothing if they are
+theorems of the audit list CoSimFoundationsAudit.lean, by "(def)" if they are definitions or
+structures (the audit lists theorems only), and by "(+)" if they are theorems that the audit does
+not list. Each name is preceded by the file of its module in the folder CoSimFoundations. Formulas
+are written in plain text: A_0 = diag(A_i) and A_c are the block-diagonal and the coupling part of
+A, A_sig the signed coupling with the blocks sig_ik A_ik, sig_ik = +1 if k runs at an earlier stage
+than i and -1 otherwise, sigma_ik = (sig_ik + 1)/2, U = exp(H A), At the modified system, Delta = At
+- A, Delta_R and Delta_J its numerical dissipation and interconnection, Ahat and Ehat the pair of a
+scheme, T_i the local defect, |.| the Euclidean and ||.|| the spectral norm.
+
+------------------------------------------ Status values -------------------------------------------
+
+  FULL     the Lean statement is the statement of the paper, possibly more general or with
+           explicit constants in place of a remainder O(H^p)
+  PARTIAL  a stated part is formalised and a stated part is not; the note says which
+  SPECIAL  formalised in a special case only; the note says which
+  NONE     no Lean statement ("related" then names declarations close to it, if there are any)
+
+------------------------------- Conventions that apply to many rows --------------------------------
+
+  (C1) A statement "to leading order", "+ O(H^p)" or "for small macro steps" is in Lean one scheme
+       at one macro step H with an explicit constant in the remainder. The structure
+       HeldScheme.Consistent A U H a b c requires H >= 0, U = exp(H A), a matrix A without a block
+       between different subsystems that are not partners, and the three bounds ||G^new C|| <= a H,
+       ||X - I|| <= b H, ||X - U|| <= c H^2. Neither F = I + O(H) nor a bound on G^old C is assumed.
+       The zero-order hold satisfies the three bounds with a = 3 s ||A||, b = 8 ||A||, c = 3
+       (1 + 6 s) ||A||^2, s the square root of the number of subsystems, for H ||A|| <= 1/4 and s
+       H ||A|| <= 1/6 (HeldScheme.zoh_consistent in ZeroOrderHold.lean).
+  (C2) A scheme with one held sample is the structure HeldScheme: matrices F, N = G^new C, M = G^old
+       C and X on the states Fin n with X = F + M + N X, a map sub from the states to the
+       subsystems, a partner relation and stages; F vanishes between different subsystems, N has
+       entries only from partners at an earlier stage, M only from partners that do not run at an
+       earlier stage. The objects B_i, L_ij, C_j, G_ij of the paper do not occur unless a row names
+       them. A block of a matrix T is expressed by the numbers <x, T y> with x supported on one
+       subsystem and y on another, or by the padded blocks HeldScheme.cblock and HeldScheme.blk.
+  (C3) The modified system is modifiedSystem H X = (1/H) log X with the logarithm series of Mathlib;
+       exp(H At) = X is proved for ||X - I|| < 1. Statements about the modified system of a
+       consistent scheme take H > 0, b H <= 1/3 and H ||A|| <= 1/4; for the zero-order hold these
+       are H ||A|| <= 1/24 and s H ||A|| <= 1/6.
+  (C4) Power-conjugate ports are the hypothesis hskew: A q p = -A p q for states p, q of different
+       subsystems. It occurs only where the paper assumes power-conjugate ports. "Partner weights
+       only" is F = exp(H A_0), or, for one subsystem s, that the block s of F is that of
+       exp(H A_s).
+  (C5) The total numerical damping nu is numDamping A H X = -tr Delta. The injection rate iota and
+       the added damping mu are not defined as eigenvalues: they enter as any real numbers with
+       -iota |v|^2 <= <v, Delta_R v> <= mu |v|^2 for all v, of which -lambda_min and lambda_max are
+       the least.
+  (C6) Psi_0 is HeldScheme.midpointPsi = phi^(-1) + (H/2) A_0 with phi = phi_1(H A_0) and
+       phi_1(Z) = sum_j Z^j/(j+1)!, the matrix diag(phi_i) of the paper. Statements with Psi_0, E or
+       Q take the invertibility of phi as a hypothesis; it is proved for H ||A_0|| <= 1
+       (isUnit_det_phiOne in MidpointForm.lean).
+  (C7) Statements on schemes with l held samples and on what a subsystem is shown are stated for
+       operators on real normed spaces: a map P of norm at most one onto the states of subsystem i,
+       the coupling row P A = A_i P + sum_j L_j C_j over the partners j with the output maps C_j,
+       and sigma_j = 0 or 1 for each partner. The largest relative error eps_K over a run is
+       replaced by an arbitrary upper bound delta of the relative errors of all runs; the forms for
+       the least upper bound and for single runs are separate declarations where a row names them.
+  (C8) "Sequential scheme" (no two partners share a stage) is the hypothesis hns; "distinct stages"
+       (no two subsystems share a stage) is the hypothesis hstage.
+
+====================================================================================================
+PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
+====================================================================================================
+
+---------------------------------------- Section 2: Setting ----------------------------------------
+
+[001] Section 2.1, eqs. (1), (2)                                                             PARTIAL
+     label    : eq:sub, eq:ref
+     statement: Subsystems x_i' = A_i x_i + B_i u_i, y_i = C_i x_i; coupling u = L y; the monolithic
+                system x' = A x with A = A_0 + A_c and the blocks A_ij = B_i L_ij C_j;
+                power-conjugate ports: L = -L^T, A_ij = -A_ji^T.
+     Lean     : Setting.lean: Plant.reference_eq, power_conserving_iff
+                HalfStep.lean: HeldScheme.blockDiag (def), HeldScheme.coupling (def),
+                  HeldScheme.blockDiag_add_coupling
+                OneSided.lean: HeldScheme.Hidden.of_ports
+                PortDissipation.lean: HeldScheme.skew_of_ports
+     note     : Formalised: the elimination of u = L y for the aggregate plant (with a feedthrough D
+                and I - D L invertible); that the coupling conserves power exactly if L is skew; the
+                split A = A_0 + A_c for any matrix and any grouping of the states; A_ki = -A_ik^T
+                from a skew L where the coupling blocks are those of B L B^T. Not formalised as
+                objects: the subsystems with their matrices B_i, C_j and the block structure
+                A_ij = B_i L_ij C_j. All other modules take a matrix A with the hypotheses of (C1)
+                and (C4).
+
+[002] Definition 2.1 (scheme with one held sample), (3)                                         FULL
+     label    : def:scheme, eq:info
+     statement: A scheme with one held sample advances subsystem i by F_i x_i plus G_ij times one
+                sample of each partner output: the new sample if the partner runs at an earlier
+                stage, else the old one.
+     Lean     : ForcedBlock.lean: HeldScheme (def)
+                InfoForm.lean: infoStep (def), eq_infoStep_mulVec_iff, infoStep_mulVec_apply,
+                  infoStep_diagonal_mulVec_apply
+                SimilarOrdersBlock.lean: HeldScheme.X_eq_infoStep
+     note     : HeldScheme is the block form (C2). InfoForm.lean states the rule state by state,
+                with the states as outputs (for output maps, G C stands in the place of G);
+                HeldScheme.X_eq_infoStep joins the two forms.
+
+[003] Definition 2.1 (i), (ii), (iii)                                                        PARTIAL
+     label    : def:scheme
+     statement: The coefficients F_i, G_ij for partner weights W_ij(s), for the own output, and for
+                a local gain; the zero-order hold W_ij = L_ij.
+     Lean     : HalfStepZOH.lean: HeldScheme.zoh (def), HeldScheme.zohCoupling (def),
+                  HeldScheme.zohKernel_apply_eq_integral, HeldScheme.opE_zohKernel_eq_integral
+                ScalarStores.lean: scalar_step, ScalarNet.step_eq
+                GaussSeidel.lean: ScalarNet.gs_step_eq
+                Setting.lean: Plant.local_closure
+                OwnOutputBlock.lean: HeldScheme.Consistent.own_output_gain_block,
+                  HeldScheme.Consistent.own_output_weight_block
+     note     : Formalised: (1) the zero-order hold of (i) as a scheme, for subsystems with any
+                number of states and every assignment of stages, by its formula F = exp(H A_0), G^o
+                C = (integral of exp(s A_0) over [0, H]) A_c; the kernel is defined by the series of
+                phi_1 and proved equal to the integral. (2) For scalar stores with constant weights
+                and a local gain the step is derived from the differential equations, in a Jacobi
+                scheme and in the sequential order 0, 1, ..., n-1. (3) The formulas of (ii) with a
+                constant weight and of (iii) occur as hypotheses on the block of F in the rows of
+                Proposition 6.1. Not formalised: weights that depend on the local time, and the
+                derivation of (i) to (iii) from the differential equations for subsystems with
+                several states.
+
+[004] Section 2.2, text: local gains for a scalar store                                      PARTIAL
+     label    : (text)
+     statement: For a scalar store a local gain realises every F_i > 0 and every G_ij.
+     Lean     : ScalarStores.lean: ScalarNet.range_jacobiStep
+                InfoForm.lean: ScalarNet.exists_gsStep_eq_infoStep
+     note     : Formalised for a Jacobi scheme and for the sequential order 0, 1, ..., n-1, for
+                every H > 0. Not formalised: an arbitrary assignment of stages.
+
+[005] (5)                                                                                       FULL
+     label    : eq:X
+     statement: X = (I - G^new C)^(-1) (F + G^old C); the inverse exists; in a Jacobi scheme X = F +
+                G C.
+     Lean     : InfoForm.lean: infoStep (def), infoStep_mul_output, eq_infoStep_iff,
+                  det_one_sub_infoNew, isUnit_det_one_sub_infoNew, infoStep_jacobi
+                StoredEnergy.lean: HeldScheme.det_one_sub_N, HeldScheme.X_eq_inv_mul
+     note     : det(I - G^new C) = 1 for every assignment of stages; X is the only solution of
+                (I - G^new C) X = F + G^old C.
+
+[006] (6)                                                                                       FULL
+     label    : eq:memory
+     statement: A scheme with l held samples: x_i^(k+1) = F_i x_i^k + sum over the partners j and
+                q < l of G_ij^q times the sample of y_j at t_(k + sigma_ij - q). Bounded weights.
+     Lean     : VisibilityConverse.lean: IsMemoryRun (def), newSample (def), IsMemoryRun.eq_of_start
+     note     : A definition: IsMemoryRun is the rule as a property of a sequence of states, for
+                every order of execution and subsystems with any number of states; a run is
+                determined by its first l states. There is no one-step map on states and stored
+                samples. In the rows of Section 4 the rule enters through the row of one subsystem,
+                (40). "The weights are bounded" is the hypothesis ||g_r C|| <= w H on the samples of
+                every instant other than t_k.
+
+[007] Definition 2.2 (modified system, difference, one-step error): the modified system      PARTIAL
+     label    : def:mod
+     statement: A modified system is a matrix At with exp(H At) = X whose eigenvalues lambda satisfy
+                H |Im lambda| < pi.
+     Lean     : DifferenceLead.lean: modifiedSystem (def), exp_smul_modifiedSystem,
+                  norm_opE_modifiedSystem_le
+                DifferenceLeadHalfStep.lean: HeldScheme.Consistent.exp_smul_modifiedSystem
+     note     : Formalised: At = (1/H) log X with the logarithm series (C3), and exp(H At) = X for
+                H != 0 and ||X - I|| < 1. Not formalised: the condition on the eigenvalues, and that
+                the series is the principal logarithm.
+
+[008] Definition 2.2, (7): the difference                                                       FULL
+     label    : def:mod, eq:diff
+     statement: Delta = At - A.
+     Lean     : DifferenceLead.lean: difference (def), modifiedSystem_exp_smul, difference_exp_smul
+     note     : A definition. The modified system of U = exp(H A) is A, and its difference is 0, for
+                0 < H and H ||A|| <= 1/4.
+
+[009] Definition 2.2: relative one-step map and one-step error                                  FULL
+     label    : def:mod
+     statement: D = X U^(-1); alpha = ||D - I|| is the largest error after one macro step relative
+                to the state that the monolithic system reaches.
+     Lean     : ReactionSV.lean: HeldScheme.Consistent.defect
+                EnergyExtremal.lean: QSpace.isGreatest_accuracy
+     note     : D = X exp(-H A) satisfies D U = X and ||D - I|| <= c (1 + ||A|| exp(H ||A||) H) H^2
+                for a consistent scheme. alpha is the largest relative error of one step and is
+                attained; stated for the norm of any energy matrix Q.
+
+[010] Section 2.3, text: existence and uniqueness of the modified system                     PARTIAL
+     label    : (text)
+     statement: A modified system exists if and only if X has no eigenvalue on the half line from
+                minus infinity to 0, and it is then unique; Delta = 0 if and only if X = U.
+     Lean     : RealLog.lean: exists_modified_system_matrix
+                DifferenceLead.lean: modifiedSystem_exp_smul, difference_exp_smul
+     note     : Formalised: a real matrix At with exp(H At) = X exists if det((1 - t) I + t X) != 0
+                for 0 <= t <= 1, that is, if X has no eigenvalue on the negative real axis or at 0;
+                Delta = 0 if X = U, for H ||A|| <= 1/4. Not formalised: that the condition is
+                necessary, the uniqueness, and "Delta = 0 only if X = U".
+
+[011] (8)                                                                                    PARTIAL
+     label    : eq:JR
+     statement: A = J - R with J = skew A, R = -sym A = -diag(sym A_i); d/dt (1/2)|x|^2 = -x^T R x.
+     Lean     : EnergyNorm.lean: energy_rate_eq
+                Setting.lean: Plant.energy_balance, sym (def)
+     note     : Formalised: a quadratic form sees the symmetric part only (for any energy matrix Q),
+                and the energy balance of the aggregate plant along a solution. Not a declaration:
+                that sym A is block diagonal for power-conjugate ports (it follows from hskew).
+
+[012] (9)                                                                                       FULL
+     label    : eq:split
+     statement: At = (J + Delta_J) - (R + Delta_R), Delta = Delta_J - Delta_R, with Delta_J = skew
+                Delta and Delta_R = -sym Delta.
+     Lean     : DifferenceLeadHalfStep.lean: numInterconnection (def),
+                  numInterconnection_sub_numDissipation
+                LosslessEnergy.lean: numDissipation (def)
+                AmountLead.lean: isSymm_numDissipation, inner_numDissipation_self
+
+[013] Section 2.4, text: the energy along the modified system; the sum of its growth rates   PARTIAL
+     label    : (text)
+     statement: Along every solution of the modified system d/dt (1/2)|x|^2 = -x^T (R + Delta_R) x,
+                and tr At = tr A - tr Delta_R.
+     Lean     : EnergyNorm.lean: energy_rate_eq, energy_rate_skew
+                AmountLead.lean: inner_numDissipation_self
+                DifferenceLead.lean: numDamping_eq_trace_numDissipation
+                TripleLawGeneral.lean: trace_neg_sym
+     note     : Formalised: the algebraic identities (x^T Q D x = x^T sym(Q D) x; it vanishes if Q D
+                is skew; <v, Delta_R v> = -<v, Delta v>) and the trace, nu = tr Delta_R = -tr Delta.
+                Not formalised: the derivative of the energy along a solution of x' = At x.
+
+[014] Section 2.4, text: a lossless system conserves the energy exactly if Delta_R = 0       PARTIAL
+     label    : (text)
+     statement: If R = 0, the co-simulation conserves the energy from every initial state at every
+                communication point exactly if Delta_R = 0.
+     Lean     : LosslessEnergy.lean: lossless_energy_iff_small_step,
+                  energy_conserved_iff_orthogonal, numDissipation_eq_zero_iff,
+                  energy_conserved_of_numDissipation_eq_zero,
+                  trace_numDissipation_eq_zero_of_energy_conserved,
+                  transpose_log_eq_neg_of_orthogonal
+     note     : Formalised: the equivalence for ||X - I|| <= 1/3 (with At the logarithm series
+                divided by H); the energy is conserved exactly if X is orthogonal; for every real
+                matrix At with exp(H At) = X, Delta_R = 0 implies conservation, and conservation
+                implies tr Delta_R = 0. Not formalised: "only if" beyond ||X - I|| <= 1/3, which
+                needs the principal logarithm.
+
+[015] Example 2.3 (zero-order hold on an undamped pair)                                         NONE
+     label    : ex:zoh
+     statement: X = I + h J has H Delta_J = -(h - arctan h) J and H Delta_R = -(1/2) ln(1 + h^2) I.
+     note     : A closed form of a principal logarithm; not stated in the library.
+
+[016] Definition 2.4 (injection and damping)                                                 PARTIAL
+     label    : def:props
+     statement: iota = -lambda_min(Delta_R), mu = lambda_max(Delta_R), nu = tr Delta_R = -tr Delta.
+     Lean     : DifferenceLead.lean: numDamping (def), numDamping_eq_trace_numDissipation
+     note     : Formalised: nu, as a definition, with nu = tr Delta_R. iota and mu have no
+                definition and no eigenvalue is used: every statement on them is proved for all
+                bounds of the quadratic form of Delta_R (C5), hence for the two eigenvalues.
+
+[017] Section 2.4, text after Definition 2.4: the quantities over one macro step                NONE
+     label    : (text)
+     statement: H nu = -ln det D exactly; s_+ - 1 = H iota and 1 - s_- = H mu to leading order.
+     related  : DetExp.lean: det_exp
+     note     : det exp(M) = exp(tr M) is formalised; the three statements are not.
+
+----------------------------------- Section 3: Half a macro step -----------------------------------
+
+[018] Lemma 3.1 (half a macro step), (13)                                                       FULL
+     label    : thm:half, eq:pair
+     statement: Every scheme, in every order of execution and at every macro step: Ehat (x^(k+1) -
+                x^k)/H = Ahat (x^(k+1) + x^k)/2 with Ahat = (F - I + G C)/H and Ehat = (I + F)/2 -
+                (G^new - G^old) C / 2.
+     Lean     : SchemePencil.lean: HeldScheme.pencilA (def), HeldScheme.pencilE (def),
+                  HeldScheme.pencil_pair, HeldScheme.pencil_midpoint, HeldScheme.pencil_midpoint_one
+                MidpointForm.lean: HeldScheme.held_midpoint, held_midpoint_ring
+     explicit : H != 0 in the forms with Ahat (the division by H); the forms with H Ahat = F - I + M
+                + N need nothing.
+     note     : Exact, with no hypothesis on the scheme; held_midpoint_ring is the identity in any
+                ring.
+
+[019] Lemma 3.1, (10)                                                                           FULL
+     label    : thm:half, eq:midpoint
+     statement: The zero-order hold satisfies, in every order of execution and at every macro step,
+                E (x^(k+1) - x^k)/H = A (x^(k+1) + x^k)/2 with E = Psi_0 - (H/2) A_sig; in the
+                proof, Ahat = phi A and Ehat = phi E.
+     Lean     : MidpointForm.lean: HeldScheme.midpointPsi (def), HeldScheme.zoh_midpoint_psi,
+                  HeldScheme.zoh_midpoint_psi_mulVec, HeldScheme.zoh_midpoint,
+                  HeldScheme.zoh_midpoint_psi_of_norm_le, isUnit_det_phiOne
+                MidpointStability.lean: HeldScheme.midpointE (def)
+                SchemePencil.lean: HeldScheme.zoh_pencilA, HeldScheme.zoh_pencilE,
+                  HeldScheme.zoh_pencilE_eq
+     explicit : An invertible phi = phi_1(H A_0) (C6); proved for H ||A_0|| <= 1. Psi_0 is given as
+                phi^(-1) + (H/2) A_0, the form in which the proof of the paper uses it.
+     note     : Exact, for every assignment of stages (links within a stage included) and every real
+                H. HeldScheme.zoh_midpoint is the form without an inverse, (I + (H/2) phi A_0 -
+                (H/2) phi A_sig)(X - I) = (H/2) phi A (X + I), which needs no hypothesis.
+
+[020] Lemma 3.1: the closed form of Psi_0                                                       NONE
+     label    : thm:half
+     statement: Psi_0 = (H/2) A_0 coth((H/2) A_0) = I + H^2 A_0^2 / 12 + O(H^4).
+     note     : Neither the closed form nor the expansion is stated; see (C6).
+
+[021] Lemma 3.1, (11)                                                                        PARTIAL
+     label    : thm:half, eq:halfstep
+     statement: The zero-order hold is the implicit midpoint rule for E x' = A x, that is, for the
+                shifted system Psi_0,i x_i' = A_i x_i + B_i sum_k L_ik (y_k + (1/2) sig_ik H y_k').
+     Lean     : MidpointForm.lean: HeldScheme.zoh_midpoint_psi_mulVec
+                HalfStep.lean: HeldScheme.signedCoupling (def)
+     note     : Formalised: the matrix identity of (10), of which (11) is row i. Not a declaration:
+                (11) as a differential equation with B_i, L_ik and y_k.
+
+[022] Lemma 3.1, (12)                                                                           FULL
+     label    : thm:half, eq:half
+     statement: Every scheme: X - U = (F - exp(H A_0)) + (G - G^o) C + (1/2) H^2 A_sig A + O(H^3).
+     Lean     : HalfStepZOH.lean: HeldScheme.Consistent.norm_half_step_zoh_le,
+                  HeldScheme.Consistent.half_step_zoh_row, HeldScheme.Consistent.norm_zoh_step_le
+                HalfStep.lean: HeldScheme.Consistent.norm_half_step_le
+                ZeroOrderHold.lean: HeldScheme.norm_zoh_step_sub_le, HeldScheme.zoh_consistent
+     explicit : The consistency of the scheme with its constants a, b, c (C1).
+     note     : ||X - U - (F - exp(H A_0)) - (M + N - G^o C) - (1/2) H^2 A_sig A|| <= (s C_3 + C_z)
+                H^3 with s the square root of the number of subsystems, C_3 = reactionC a b c ||A||
+                H and C_z = (||A_0||^3/6 + ||A_0||^2 ||A_c||/6) exp(H ||A_0||). For the zero-order
+                hold the first two terms vanish and no consistency is assumed: ||X - U - (1/2) H^2
+                A_sig A|| <= (2/3 + 4 s + 53 s^2 + 54 s^3) ||A||^3 H^3 for H ||A|| <= 1/4 and s
+                H ||A|| <= 1/6.
+
+[023] Lemma 3.1, last sentence                                                                  FULL
+     label    : thm:half
+     statement: Delta = (X - U)/H + O(H^2); for the zero-order hold Delta = (1/2) H A_sig A +
+                O(H^2).
+     Lean     : DifferenceLead.lean: norm_opE_difference_sub_le, norm_log_sub_log_sub_le,
+                  log_exp_of_norm_le
+                DifferenceLeadHalfStep.lean: HeldScheme.Consistent.norm_difference_sub_le,
+                  HeldScheme.Consistent.norm_difference_le,
+                  HeldScheme.Consistent.norm_difference_half_step_le,
+                  HeldScheme.Consistent.norm_difference_sub_half_le
+                ZeroOrderHold.lean: HeldScheme.norm_zoh_difference_sub_half_le
+     explicit : The range of (C3).
+     note     : ||Delta - (X - U)/H|| <= K H^2 with K = (3/2) c max(b, (4/3) ||A||). Zero-order
+                hold: ||Delta - (H/2) A_sig A|| <= (37 + 220 s + 53 s^2 + 54 s^3) ||A||^3 H^2 for
+                0 < H, H ||A|| <= 1/24 and s H ||A|| <= 1/6.
+
+[024] Section 3.1, text after Lemma 3.1: the pair and the modified system                    PARTIAL
+     label    : (text)
+     statement: Ehat^(-1) Ahat = (2/H) tanh((H/2) At) = At + O(H^2).
+     Lean     : CayleyStep.lean: HeldScheme.pencil_eq_inv_cayley
+     note     : Formalised: Ehat^(-1) Ahat = (2/H) (X - I)(X + I)^(-1) for H != 0 and invertible
+                Ehat, which is the relation with X in the place of exp(H At). Not formalised: the
+                hyperbolic tangent of a matrix, and the expansion At + O(H^2).
+
+[025] Remark 3.2 (reversed order): Psi_0 is even in H                                           FULL
+     label    : rem:reversed
+     statement: Psi_0 is even in H; the zero-order hold with the macro step -H has the matrix Psi_0
+                + (H/2) A_sig, which in a sequential scheme is the matrix of the reversed order.
+     Lean     : ReversedAdjoint.lean: HeldScheme.midpointPsi_neg,
+                  HeldScheme.midpointE_restage_eq_neg
+                ReversedOrder.lean: HeldScheme.restage (def), HeldScheme.Reversed (def),
+                  HeldScheme.revStage (def), HeldScheme.reversed_revStage_sup
+     explicit : An invertible phi (C6); no two partners share a stage (C8).
+
+[026] Remark 3.2: the hold in the reversed order is the adjoint of the hold                     FULL
+     label    : rem:reversed
+     statement: In a sequential scheme X_rev(H) = X(-H)^(-1).
+     Lean     : ReversedAdjoint.lean: HeldScheme.zoh_reversed_mul_zoh_neg,
+                  HeldScheme.zoh_neg_mul_zoh_reversed, HeldScheme.zoh_reversed_eq_inv,
+                  HeldScheme.isUnit_det_zoh_X, HeldScheme.restage_couplingNew
+     explicit : No two partners share a stage (C8); subsystems that are not partners may share one.
+     note     : Exact, for every real H, with no hypothesis of invertibility: X_rev(H) X(-H) = I.
+
+[027] Remark 3.2: the alternating scheme is symmetric and of second order in its error          FULL
+     label    : rem:reversed
+     statement: Reversing the order in every second macro step is a symmetric method, of second
+                order in its error.
+     Lean     : ReversedAdjoint.lean: HeldScheme.zoh_two_step_symmetric
+                ReversedOrder.lean: two_step_identity, norm_opE_two_step_le,
+                  HeldScheme.norm_zoh_reversed_le
+     note     : With Y(H) = X_rev(H) X(H), Y(H) Y(-H) = I exactly, and ||Y(H) -
+                exp(2 H A)|| <= (5 + 39 s + 223 s^2 + 144 s^3) ||A||^3 H^3 for 0 <= H,
+                H ||A|| <= 1/4, s H ||A|| <= 1/6, if no two partners share a stage.
+
+[028] Remark 3.2: second order of the alternating scheme in its numerical dissipation           NONE
+     label    : rem:reversed
+     note     : Not stated.
+
+[029] Remark 3.2: for two subsystems it is the Strang splitting                              PARTIAL
+     label    : rem:reversed
+     statement: For two subsystems the alternating scheme is the Strang splitting.
+     Lean     : HalfStepZOH.lean: HeldScheme.zoh_X_staggered
+     note     : Formalised: if the subsystems fall into two classes without a link inside a class,
+                the first at stage 0, the one-step map of the zero-order hold is exp(H A_b)
+                exp(H A_a). The product of two such steps in the two orders as the Strang splitting
+                is not a declaration.
+
+[030] Remark 3.2: a link within a stage keeps its half step                                     FULL
+     label    : rem:reversed
+     statement: A link within a stage has the sign -1 in both orders, and its half step stays.
+     Lean     : ReversedOrder.lean: HeldScheme.signedCoupling_add_restage,
+                  HeldScheme.signedCoupling_add_restage_eq_zero, HeldScheme.norm_zoh_reversed_sub_le
+     note     : The signed couplings of the two orders add up to -2 A_par (to 0 without a link
+                within a stage), and ||X_rev X - exp(2 H A) + H^2 A_par
+                A|| <= (5 + 39 s + 223 s^2 + 144 s^3) ||A||^3 H^3 for every assignment of stages, in
+                the range of H of the row on the second order.
+
+[031] Remark 3.3 (growth of a mode), (14)                                                       NONE
+     label    : cor:modes, eq:mode
+     statement: A simple eigenvalue lambda of A changes by w^* Delta v / w^* v to first order; for
+                the zero-order hold it becomes lambda (1 + (1/2) H w^* A_sig v / w^* v) + O(H^2).
+     note     : No first-order perturbation of an eigenvalue is formalised. That the first-order
+                term vanishes in an order with offsets is the fourth row of Corollary 3.5.
+
+[032] Corollary 3.4 (stability), (15): the Cayley transform of the pencil                       FULL
+     label    : cor:stability, eq:cayley
+     statement: X v = xi v exactly if Ahat v = theta Ehat v, with
+                xi = (1 + H theta/2)/(1 - H theta/2).
+     Lean     : SchemePencil.lean: HeldScheme.pencil_cayley_iff, HeldScheme.pencil_eigen_of_pencil,
+                  HeldScheme.pencilE_sub, HeldScheme.det_pencilE_sub
+     explicit : H > 0; xi != -1 in the direction from xi to theta = (2/H)(xi - 1)/(xi + 1) (the case
+                xi = -1 is the third row).
+     note     : For complex eigenvalues and eigenvectors of the real matrices. Ehat - (H/2) Ahat = I
+                - G^new C has the determinant 1, so that 1 - H theta/2 != 0 for every eigenvalue
+                theta of the pencil. With it: |xi| < 1 exactly if Re theta < 0, and |xi| = 1 exactly
+                if Re theta = 0.
+
+[033] Corollary 3.4, (15): the reciprocal                                                       FULL
+     label    : cor:stability, eq:cayley
+     statement: 1/theta = H/2 + H/(xi - 1).
+     Lean     : ReciprocalEigenvalues.lean: reciprocal_cayley_inv, HeldScheme.pencil_reciprocal_iff,
+                  HeldScheme.pencil_reciprocal_iff_complex, HeldScheme.pencil_cayley_reciprocal
+     explicit : xi != 1 and xi != -1 for the scalar identity; the vector form Ehat v = (H/2 +
+                H/(xi - 1)) Ahat v needs xi != 1 only.
+
+[034] Corollary 3.4: the eigenvalue -1                                                          FULL
+     label    : cor:stability
+     statement: X v = -v if and only if Ehat v = 0.
+     Lean     : SchemePencil.lean: HeldScheme.pencil_neg_one_iff,
+                  HeldScheme.pencil_neg_one_eigenvalue_iff
+     note     : Also: -1 is an eigenvalue of X exactly if det Ehat = 0.
+
+[035] Corollary 3.4: asymptotic stability                                                       FULL
+     label    : cor:stability
+     statement: If Ehat is invertible, the co-simulation is asymptotically stable if and only if the
+                system Ehat x' = Ahat x is.
+     Lean     : SchemePencil.lean: HeldScheme.pencil_spectrum_iff,
+                  HeldScheme.pencil_spectrum_iff_inv
+     note     : Stated on the eigenvalues: every eigenvalue of X has a modulus below one if and only
+                if Ehat is invertible and every eigenvalue of Ehat^(-1) Ahat has a negative real
+                part. That the powers of X then tend to zero, and the solutions of the system
+                likewise, is not part of the statement.
+
+[036] Corollary 3.4: stability that is not asymptotic                                           NONE
+     label    : cor:stability
+     statement: If Ehat is invertible, the co-simulation is stable if and only if Ehat x' = Ahat x
+                is.
+     related  : SchemePencil.lean: HeldScheme.pencil_cayley_iff
+     note     : The library has no Jordan form. The eigenvalues correspond (|xi| = 1 exactly if Re
+                theta = 0); the correspondence of the Jordan chains is not formalised.
+
+[037] Corollary 3.4, proof: X is a function of Ehat^(-1) Ahat                                PARTIAL
+     label    : cor:stability
+     statement: For invertible Ehat the map X is a function of Ehat^(-1) Ahat with the same
+                eigenvectors and Jordan chains.
+     Lean     : CayleyStep.lean: CayleyStep.step_eq_cayley, CayleyStep.commute_step,
+                  CayleyStep.eq_inv_cayley, CayleyStep.conj_step, CayleyStep.isUnit_det_add_one,
+                  HeldScheme.pencil_step_eq_cayley, HeldScheme.pencil_commute_step,
+                  HeldScheme.pencil_eq_inv_cayley, HeldScheme.isUnit_det_X_add_one
+     note     : Formalised, with M = Ehat^(-1) Ahat: X = (I - (H/2) M)^(-1) (I + (H/2) M), X
+                commutes with M, M = (2/H)(X - I)(X + I)^(-1), X + I is invertible, and the relation
+                in every other basis. Not formalised: the Jordan chains.
+
+[038] Corollary 3.4: the zero-order hold                                                        FULL
+     label    : cor:stability
+     statement: For the zero-order hold the system is the shifted system, with the pencil (A, E).
+     Lean     : MidpointStability.lean: HeldScheme.zoh_pencil_of_eigen,
+                  HeldScheme.zoh_eigen_of_pencil, HeldScheme.zoh_neg_one_iff,
+                  HeldScheme.zoh_neg_one_eigenvalue_iff, HeldScheme.zoh_spectrum_iff_inv
+     explicit : An invertible phi (C6).
+
+[039] Section 3.2, text: the zero-order hold in a Jacobi scheme                                 FULL
+     label    : (text)
+     statement: X = I + H phi A, so that 1/theta = 1/lambda^ + H/2 for each eigenvalue lambda^ of
+                phi A.
+     Lean     : ReciprocalEigenvalues.lean: HeldScheme.zoh_X_sub_one_of_jacobi,
+                  HeldScheme.zoh_jacobi_eigen_iff_complex, HeldScheme.zoh_jacobi_reciprocal
+     explicit : H != 0 and lambda^ != 0 for the reciprocal.
+
+[040] Corollary 3.5 (offsets): the commutator                                                   FULL
+     label    : cor:offsets
+     statement: If p_i - p_k = sig_ik for all partners i and k, then A_sig = P A - A P with
+                P = diag(p_i I).
+     Lean     : Offsets.lean: HeldScheme.IsOffset (def), HeldScheme.offsetP (def),
+                  HeldScheme.signedCoupling_eq_commutator
+     note     : For real offsets; no hypothesis on the ports.
+
+[041] Corollary 3.5, (16)                                                                       FULL
+     label    : cor:offsets, eq:tree
+     statement: The eigenvalues xi of the one-step map of every scheme are the roots of det(xi I - F
+                - sqrt(xi) G C) = 0.
+     Lean     : Offsets.lean: HeldScheme.IsStageOffset (def), HeldScheme.IsStageOffset.isOffset,
+                  HeldScheme.det_sq_sub_X_of_offset, HeldScheme.exists_eigenvector_X_iff_of_offset,
+                  HeldScheme.det_sq_sub_zoh_X_of_offset
+                TreeDeterminant.lean: det_sq_sub_eq_of_potential
+                TreeDeterminantScheme.lean: HeldScheme.det_sq_sub_X_of_potential,
+                  HeldScheme.det_sq_sub_X_of_isAcyclic
+     explicit : Integer offsets (offsets with p_i - p_k = sig_ik are integers up to one constant on
+                each component of the coupling graph).
+     note     : det(s^2 I - X) = det(s^2 I - F - s (N + M)) for every s in a field that contains the
+                real numbers, for subsystems with any number of states; hence the eigenvalues with
+                their multiplicities.
+
+[042] Corollary 3.5, (17)                                                                       FULL
+     label    : cor:offsets, eq:offsets
+     statement: The zero-order hold satisfies X = T U T^(-1) + O(H^3) with the rows of subsystem i
+                of T those of exp((1/2) p_i H A).
+     Lean     : OffsetsConjugacy.lean: HeldScheme.offsetT (def),
+                  HeldScheme.norm_zoh_mul_offsetT_sub_le, HeldScheme.norm_zoh_sub_conj_le,
+                  HeldScheme.isUnit_det_offsetT, offsetK (def), offsetT1 (def)
+     explicit : A bound rho on the offsets, |p_i| <= rho, on which the constant depends; 0 <= H,
+                H ||A|| <= 1/4, s H ||A|| <= 1/6, and H t_1 < 1 for the form with the inverse.
+     note     : ||X T - T U|| <= K H^3 and ||X - T U T^(-1)|| <= K H^3 / (1 - H t_1) with the
+                explicit K = offsetK and t_1 = offsetT1. For real offsets.
+
+[043] Corollary 3.5: no mode grows                                                              FULL
+     label    : cor:offsets
+     statement: In (14) no mode grows: w^* A_sig v = 0 for a left and a right eigenvector of A to
+                one eigenvalue.
+     Lean     : Offsets.lean: HeldScheme.dotProduct_signedCoupling_eq_zero,
+                  HeldScheme.dotProduct_signedCoupling_eq_zero_real, dotProduct_commutator_eq_zero
+
+[044] Corollary 3.5: the eigenvalues with H and with -H                                      PARTIAL
+     label    : cor:offsets
+     statement: The eigenvalues of the hold with the macro step H are the reciprocals of those with
+                -H, so that the eigenvalues of its modified system are even in H.
+     Lean     : Offsets.lean: HeldScheme.charpoly_zoh_eq_charpoly_inv_neg
+     explicit : Integer offsets.
+     note     : Formalised: X(H) and X(-H)^(-1) have the same characteristic polynomial. Not
+                formalised: the consequence for the eigenvalues of the modified system.
+
+[045] Corollary 3.5: offsets exist on a coupling graph without a cycle                          FULL
+     label    : cor:offsets
+     statement: Offsets exist in every sequential order on a coupling graph without a cycle.
+     Lean     : Offsets.lean: HeldScheme.exists_isStageOffset
+                TreeDeterminant.lean: exists_stagePotential
+     note     : For finitely many subsystems whose partners are linked in an acyclic graph, if no
+                two partners share a stage.
+
+[046] Corollary 3.5: the one-step maps of all these orders are similar                          FULL
+     label    : cor:offsets
+     statement: On a coupling graph without a cycle the one-step maps of all sequential orders are
+                similar if the coefficients F_i are invertible.
+     Lean     : SimilarOrdersBlock.lean: HeldScheme.exists_units_conj_X,
+                  HeldScheme.exists_units_conj_zoh_restage, exists_units_conj_infoStep_of_isAcyclic,
+                  exists_units_conj_infoStep_block, orderProd_blockStep_eq_infoStep
+                TreeDeterminant.lean: charpoly_infoStep_eq_of_isAcyclic
+                TreeDeterminantScheme.lean: HeldScheme.charpoly_zoh_restage_eq
+                Offsets.lean: HeldScheme.charpoly_zoh_restage_eq_of_offset
+                SimilarOrders.lean: isConj_orderProd_of_isAcyclic
+                SimilarOrdersScheme.lean: exists_units_conj_infoStep
+     explicit : The two schemes have F and the sum G C of the sample coefficients in common (the
+                coefficients do not depend on the order); F invertible.
+     note     : For subsystems with any number of states; subsystems that are not partners may share
+                a stage. For the zero-order hold at every macro step, with no further hypothesis.
+                With a singular F the equality of the characteristic polynomials is proved
+                (charpoly_infoStep_eq_of_isAcyclic), and so it is for the zero-order hold in two
+                orders with offsets on a graph with a cycle. The proof rests on
+                isConj_orderProd_of_isAcyclic: products of invertible elements that commute off an
+                acyclic graph are conjugate in every order; exists_units_conj_infoStep is the case
+                of scalar stores.
+
+[047] Section 3.2, text after Corollary 3.5: without dynamics of the subsystems                 FULL
+     label    : (text)
+     statement: With F = I and G C = H A, (16) is (xi - 1)^2 = xi H^2 lambda^2 for each eigenvalue
+                lambda != 0 of A, that is, 1/theta^2 = 1/lambda^2 + H^2/4.
+     Lean     : ReciprocalEigenvalues.lean: HeldScheme.det_sq_sub_X_one_of_offset,
+                  HeldScheme.exists_eigenvector_X_sq_iff_of_offset_one,
+                  HeldScheme.zoh_N_add_M_of_blockDiag_eq_zero,
+                  HeldScheme.zoh_eigen_sq_iff_of_offset, reciprocal_sq_eq,
+                  HeldScheme.zoh_reciprocal_sq_of_offset
+     explicit : Integer offsets; H != 0; xi = s^2 with s != 0, s^2 != 1, s^2 != -1.
+     note     : In the form H lambda = s - 1/s with xi = s^2. The frequency of the leapfrog method
+                that the paper reads from the relation is not formalised.
+
+[048] Section 3.2, text after Corollary 3.5: two subsystems and the leapfrog method             FULL
+     label    : (text)
+     statement: For two subsystems (17) is the conjugacy of the splitting to the leapfrog method.
+     Lean     : HalfStepZOH.lean: HeldScheme.zoh_X_staggered
+                ZeroOrderHoldDamping.lean: HeldScheme.zoh_staggered_conj,
+                  HeldScheme.zoh_staggered_conj_pow, HeldScheme.norm_zoh_staggered_pow_sub_le
+                Staggered.lean: staggered_conj, norm_staggered_sub_exp_le,
+                  norm_staggered_pow_sub_exp_pow_le
+     explicit : The subsystems fall into two classes without a link inside a class, of which the
+                first runs at stage 0.
+     note     : Exact: with W = exp((H/2) A_a), W X W^(-1) = exp((H/2) A_a) exp(H A_b) exp((H/2)
+                A_a), the Strang splitting, and ||W X^k W^(-1) - U^k|| <= (m^3/3) T exp(m T) H^2 for
+                k H <= T, with m = ||A_a|| + ||A_b||.
+
+[049] Corollary 3.6 (the blocks of the half step) (a), (18)                                     FULL
+     label    : cor:blocks, eq:forced
+     statement: For i != j that are not partners, the block (i, j) of X - U is (1/2) H^2 sum_k
+                sig_ik A_ik A_kj + O(H^3).
+     Lean     : ForcedBlock.lean: HeldScheme.Consistent.forced_block,
+                  HeldScheme.Consistent.forced_entry
+                Reaction.lean: HeldScheme.Consistent.forced_block'
+                HalfStep.lean: HeldScheme.Consistent.half_step_forced
+                ForcedNorm.lean: HeldScheme.Consistent.norm_forced_block_sub_le
+     explicit : The consistency of the scheme (C1).
+     note     : Remainder C H^3 |x| |y| with C = forcedC or reactionC a b c ||A|| H; as a norm of
+                the block in norm_forced_block_sub_le. No power-conjugate ports.
+
+[050] Corollary 3.6 (b), (19)                                                                   FULL
+     label    : cor:blocks, eq:onesided
+     statement: Behind the port of a partner j: the block (i, j) of X - U on the kernel of C_j is
+                (1/2) H^2 sig_ij A_ij A_j + O(H^3).
+     Lean     : OneSided.lean: HeldScheme.Hidden (def), HeldScheme.Hidden.of_ports,
+                  HeldScheme.Consistent.one_sided
+     note     : The projection Theta_j is replaced by the property HeldScheme.Hidden of a state v of
+                j: the coefficients of the samples vanish on v, and A v lies in subsystem j.
+                Hidden.of_ports derives it from M = G^old C, N = G^new C, A = B L C between
+                different subsystems and C v = 0.
+
+[051] Corollary 3.6 (c), (20)                                                                   FULL
+     label    : cor:blocks, eq:reaction
+     statement: The block (i, i) of X - U is F_i - exp(H A_i) + (1/2) H^2 sum_k sig_ik A_ik A_ki +
+                O(H^3); with partner weights only the remaining term is the same for all weights.
+     Lean     : ReactionDiag.lean: HeldScheme.Consistent.reaction_diag,
+                  HeldScheme.Consistent.reaction_diag_skew,
+                  HeldScheme.Consistent.reaction_partner_weights
+                HalfStep.lean: HeldScheme.Consistent.half_step_diag
+     explicit : Subsystem i is not its own partner (L_ii = 0).
+     note     : Remainder (C_3 + ||A_i||^3/6 exp(H ||A_i||)) H^3 |x| |y|. reaction_diag needs no
+                power-conjugate ports; the two other forms write the term as -(1/2) H^2 sum_k sig_ik
+                A_ki^T A_ki under hskew.
+
+-------------------------- Section 4: Accuracy: one order per held sample --------------------------
+
+[052] Section 4, text: the size of the block between two subsystems that are not partners       FULL
+     label    : (text)
+     statement: Every scheme has ||X - U|| >= (1/2) H^2 ||[A_sig A]_ij|| - O(H^3) and
+                ||Delta|| >= (1/2) H ||[A_sig A]_ij|| - O(H^2).
+     Lean     : ForcedNorm.lean: HeldScheme.forcedCoeff (def), HeldScheme.Consistent.forced_norm,
+                  HeldScheme.Consistent.forced_block_norm, HeldScheme.norm_opE_cblock_le_iff,
+                  HeldScheme.Consistent.forcedCoeff_jacobi
+                DifferenceLeadHalfStep.lean: HeldScheme.Consistent.difference_forced
+     note     : forcedCoeff A i j = (1/2) ||block (i, j) of A_sig A||. The bound for Delta is stated
+                on the block: |<x, Delta y> - (H/2) <x, A_sig A y>| <= (K + C_3) H^2 |x| |y| for x
+                on i and y on j, in the range of (C3).
+
+[053] (21)                                                                                      FULL
+     label    : eq:localdefect
+     statement: The local defect T_i = Pi_i U - F_i Pi_i - sum_j sum_q G_ij^q C_j U^(sigma_ij - q).
+     Lean     : BoundedCoefficients.lean: ruleDefect (def)
+                MemoryLead.lean: localDefect (def)
+                MemoryLate.lean: lateDefect (def), nodeDefect (def), proj_comp_runDefect_late
+                RunOrderRow.lean: rowDefect (def)
+                RunOrder.lean: runDefect (def)
+                OrderBarrierAll.lean: rowDefect_rule
+                RunOrderRowLead.lean: rowDefect_eq_localDefect, rowDefect_eq_lateDefect
+                RunOrderLead.lean: proj_comp_runDefect
+     note     : A definition, in the forms that the theorems use: ruleDefect (old and new samples
+                mixed, one sigma_j for each partner), localDefect (old samples only), lateDefect
+                (the new sample and l - 1 old ones), nodeDefect (any finite set of sample instants),
+                and rowDefect, the defect of a row of (40); the listed theorems identify them. The
+                sentence after (21), that for one held sample T_i is the block row i of
+                (I - G^new C)(U - X), is the form in which HeldScheme.Consistent.norm_row_defect_ge
+                uses the defect.
+
+[054] Definition 4.1 (states not shown)                                                         FULL
+     label    : def:visibility
+     statement: The states not shown to subsystem i, V_i; f_i = max |Pi_i U v| over the unit vectors
+                of V_i; f_i = 0 if V_i = {0}.
+     Lean     : VisibilityExact.lean: notShown (def), visBound (def), mem_notShown, visBound_nonneg,
+                  norm_apply_le_visBound, isGreatest_visBound, visBound_eq_zero_iff
+                VisibilityConverse.lean: shownSample (def), mem_notShown_shownSample
+     note     : notShown is the common kernel of Pi_i and of any family of sample maps; with the
+                samples shownSample (the maps C_j U^(sigma_ij - q) for the partners j and q < l) it
+                is the set of the paper. f_i is the norm of Pi_i U on it; the maximum is attained in
+                finite dimension.
+
+[055] Theorem 4.2 (visibility), (22): the defect on the states not shown                     PARTIAL
+     label    : thm:visibility, eq:visibility
+     statement: For every choice of the coefficients, T_i v = Pi_i U v for v in V_i.
+     Lean     : VisibilityExact.lean: visBound_le_norm_rule
+     note     : Formalised: the consequence ||T_i|| >= f_i for every rule. The identity itself is a
+                step inside the proof of visBound_le_norm_rule and not a declaration of its own.
+
+[056] Theorem 4.2, (22): the minimum                                                            FULL
+     label    : thm:visibility, eq:visibility
+     statement: The minimum of ||T_i|| over the coefficients F_i, G_ij^q is f_i.
+     Lean     : VisibilityExact.lean: isLeast_visBound, visBound_le_norm_rule,
+                  exists_rule_eq_comp_starProjection, exists_rule_iff_ker_le
+     note     : f_i is the least element of the set of the norms of the defects of all rules, in
+                finite dimension; the minimising rule leaves Pi_i U times the orthogonal projection
+                onto V_i.
+
+[057] Section 4.1, text: coefficients that reproduce the monolithic system if every f_i = 0     FULL
+     label    : (text)
+     statement: If f_i = 0 for every subsystem, the minimising coefficients reproduce the monolithic
+                system at every communication point.
+     Lean     : VisibilityConverse.lean: exists_exact_memory_scheme, exists_exact_hold,
+                  visBound_shownSample_eq_zero_iff, exists_rule_of_visBound_eq_zero
+                VisibilityExact.lean: exists_exact_infoStep_iff
+     note     : For every number l of held samples and every order of execution: a scheme exists
+                whose runs from l states of a monolithic trajectory are that trajectory.
+                exists_exact_infoStep_iff is the equivalence for one held sample and scalar stores.
+
+[058] Section 4.1, text: the bound for a Jacobi scheme                                          FULL
+     label    : (text)
+     statement: In a Jacobi scheme with one held sample ||Pi_i (X - U)|| >= f_i.
+     Lean     : VisibilityExact.lean: visBound_le_scheme
+                VisibilityFloor.lean: visibility_floor_current, visibility_identity,
+                  visibility_bound
+     note     : For operators; the rule of the subsystem on the samples of t_k is a hypothesis.
+
+[059] (23)                                                                                      FULL
+     label    : eq:vbound
+     statement: With one held sample, in every order of execution, f_i = (1/2) H^2 ||Pi_i A_sig A on
+                V_i^0|| + O(H^3), V_i^0 = {v: Pi_i v = 0, C_j v = 0 for the partners j}.
+     Lean     : LeadingValueOne.lean: leading_value_one, leading_value_one_nodes,
+                  exists_rightInverse_stackedDeriv_one, signedRow (def), stageSign (def), oneConst
+                  (def), mem_unseen_one
+                LeadingValue.lean: visBound_old_one, visBound_old_one_cubic
+     explicit : Surjective outputs of the partners, given by a right inverse of each output map; the
+                state space is the product of the state spaces of the subsystems; subsystem i is not
+                its own partner; 0 < H, H ||A|| <= 1, H ||A_i|| <= 1 and (e - 1) ||A|| kappa H
+                rho <= 1/2, with kappa the sum of the norms of the outputs of the partners and rho a
+                bound of the right inverse.
+     note     : |f_i - (H^2/2) ||Pi_i A_sig A on V_i^0||| <= c H^3 with the explicit c = oneConst,
+                which depends on the right inverses. Pi_i A_sig is written as the sum of sig_ij L_j
+                C_j over the partners. For a subsystem with old samples only, visBound_old_one_cubic
+                gives the remainder (e - 5/2) ||A||^3 H^3 without a hypothesis on the outputs.
+
+[060] Section 4.1, text: f_i for scalar stores                                               PARTIAL
+     label    : (text)
+     statement: For scalar stores f_i is, to leading order, (1/2) H^2 times the Euclidean norm of
+                the entries [A_sig A]_ij over the stores j that are not partners of i.
+     Lean     : OrderBarrier.lean: inner_exp_sub_quadratic_le
+     note     : Formalised: the expansion of one entry of U to the second order with its remainder.
+                The formula for f_i is the case of scalar stores of (23) and is not a declaration.
+
+[061] (24)                                                                                   SPECIAL
+     label    : eq:vboundalpha
+     statement: For a subsystem that receives no new sample: alpha >= alpha_* = max over v in V_i of
+                |Pi_i U v| / |U v| >= f_i / ||U||.
+     Lean     : FloorMatrix.lean: ScalarNet.sharp_link_floor, ScalarNet.floors, link_floor_vec
+                Floor.lean: link_floor
+                RankFloor.lean: rank_floor_zero
+                VisibilityFloor.lean: norm_comp_step_sub_le
+     note     : Special case: Jacobi schemes of scalar stores, with the scheme derived from the
+                differential equations: |(U c)_i| <= ||D - I|| |U c| for every c supported on the
+                stores that are neither i nor partners of i. For operators the two inequalities
+                behind it are formalised (if <e, D U f> = 0 then |<e, U f>| <= ||D - I|| |U f|; ||Pi
+                (D U - U)|| <= ||Pi|| ||D - I|| ||U||). Not formalised: the chain for subsystems
+                with more than one state, and alpha_* as a quantity.
+
+[062] Example 4.3 (the chain of three stores)                                                   NONE
+     label    : ex:chain
+     note     : Numbers; computed, not proved.
+
+[063] (25)                                                                                      FULL
+     label    : eq:gamma
+     statement: gamma_l^sigma = integral over [0, 1] of binom(s + l - 1 - sigma, l);
+                gamma_1^sigma = -(1/2) sig; the values 1/2, 5/12, 3/8 for old samples and -1/2,
+                -1/12, -1/24 with the new one.
+     Lean     : LeadingConstant.lean: schemeGamma (def), schemeGamma_eq_integral, schemeGamma_zero,
+                  schemeGamma_one, ddGamma_eq_integral
+                AdamsConstants.lean: adamsGamma (def), adamsGamma_eq_integral, adamsGamma_one,
+                  adamsGamma_two, adamsGamma_three, adamsGamma_four
+                MemoryLateConstants.lean: lateGamma (def), lateGamma_eq_integral, lateGamma_one,
+                  lateGamma_two, lateGamma_three, lateGamma_four, nodeGamma (def),
+                  nodeGamma_eq_integral
+                DividedDifference.lean: ddGamma (def)
+     note     : The integral is written as (1/l!) times the integral of the product of s - sigma + q
+                over q < l. The first four values are proved for sigma = 0 (1/2, 5/12, 3/8, 251/720)
+                and for sigma = 1 (-1/2, -1/12, -1/24, -19/720).
+
+[064] (26)                                                                                   PARTIAL
+     label    : eq:defectl
+     statement: Polynomial extrapolation has, in every order of execution, T_i = H^(l+1) sum_j
+                gamma_l^(sigma_ij) A_ij Pi_j A^l + O(H^(l+2)).
+     Lean     : LeadingValueScheme.lean: leadingMap (def)
+                LeadingDefect.lean: norm_proj_exp_sub_leading_le
+                DividedDifference.lean: dd_mean, norm_dd_mean_le
+     note     : Formalised on the states not shown, where the defect of every rule is Pi_i U v:
+                |Pi_i U v - H^(l+1) sum_j gamma_j L_j C_j A^l v| <= c_2 H^(l+2) |v| for 0 <= H,
+                H ||A|| <= 1, H ||A_i|| <= 1. Not formalised: the defect of polynomial extrapolation
+                on the states that the subsystem is shown (no such rule is constructed in the
+                library).
+
+[065] (27)                                                                                      FULL
+     label    : eq:ci
+     statement: V_i^0 = {v: Pi_i v = 0, C_j A^p v = 0 for the partners j and p < l}; c_i = ||Pi_i
+                A^(l+1) on V_i^0||.
+     Lean     : MemoryLead.lean: unseen (def), mem_unseen, map_mem_unseen, proj_pow_eq_zero
+                RunOrderLead.lean: unseenRate (def), unseenRate_le
+                LeadingValue.lean: unseenRate_eq_restrNorm
+                KernelPerturbation.lean: restrNorm (def)
+     note     : Definitions, with A V^[m+1] contained in V^[m] and c_i <= ||A||^(l+1).
+
+[066] Theorem 4.4 (one order per held sample) (i), (28): the first equality                     FULL
+     label    : thm:memory, eq:leading
+     statement: The minimum of ||T_i|| over the coefficients is f_i.
+     Lean     : VisibilityExact.lean: isLeast_visBound, isGreatest_visBound
+     note     : This is Theorem 4.2; it needs no independence of the maps.
+
+[067] Theorem 4.4 (i), (28): the leading value                                                  FULL
+     label    : thm:memory, eq:leading
+     statement: If the maps Pi_i and C_j A^p, j a partner and p < l, are independent, then in every
+                order of execution f_i = c_i^sigma H^(l+1) + O(H^(l+2)) with c_i^sigma = ||sum_j
+                gamma_l^(sigma_ij) A_ij Pi_j A^l on V_i^0||.
+     Lean     : LeadingValueScheme.lean: leading_value_scheme, leading_value_nodes,
+                  visBound_le_leading_nodes, stackedDeriv (def), kernelConst (def),
+                  notShown_shownSample_eq
+                LeadingValue.lean: leading_value_of_kernel
+                LeadingDefect.lean: defectConst (def)
+                KernelPerturbation.lean: abs_restrNorm_ker_sub_le, exists_rightInverse_of_surjective
+                DividedDifference.lean: forall_ddComb_eq_zero_iff, norm_ddiff_sub_le
+     explicit : The independence is given by a bounded right inverse R of the stacked map v ->
+                (Pi_i v, C_j A^p v); the constant of the remainder and the admissible macro steps
+                depend on ||R||. Further: 0 < H, H ||A|| <= 1, H ||A_i|| <= 1, c_1 H ||R|| <= 1/2
+                with the explicit c_1 = kernelConst.
+     note     : |f_i - H^(l+1) c_i^sigma| <= (c_2 + 4 ||R|| c_1 ||D||) H^(l+2) for every number of
+                held samples and every order of execution. The upper bound holds without
+                independence (visBound_le_leading_nodes).
+
+[068] Theorem 4.4 (i): samples all old or all new                                               FULL
+     label    : thm:memory
+     statement: c_i^sigma = |gamma_l^sigma| c_i if the samples are all old or all new.
+     Lean     : LeadingValueScheme.lean: leading_value_uniform, restrNorm_leadingMap_const
+     explicit : As in the row before.
+
+[069] Theorem 4.4 (ii), (29)                                                                    FULL
+     label    : thm:memory, eq:memorylead
+     statement: Samples all old or all new, coefficients of the samples of every instant other than
+                t_k at most w H, H ||A|| <= 1: ||T_i|| >= |gamma_l^sigma| c_i H^(l+1) -
+                (kappa_1 ||A|| + kappa_2 w) ||A||^(l+1) H^(l+2) with constants that depend on l
+                only.
+     Lean     : MemoryLead.lean: memory_lead, memory_lead_one, memory_lead_two, memB (def), memC1
+                  (def), memC2 (def)
+                MemoryLate.lean: memory_late, memory_nodes, memory_late_one, memory_late_two,
+                  memory_late_three, memory_late_four
+                MemoryLateConstants.lean: lateB (def), lateC1 (def), lateC2 (def)
+     note     : Lean form, for sigma = 0 (memory_lead) and sigma = 1 (memory_late):
+                (1 + b_l H ||A||) ||T_i|| >= |gamma| c_i H^(l+1) - (C_1 ||A||^(l+2) + C_2
+                w ||A||^(l+1)) H^(l+2) with explicit b_l, C_1, C_2 that depend on l only. The factor
+                stands on the left; the printed form follows by one division, with kappa_1 = C_1 +
+                |gamma| b_l and kappa_2 = C_2 (using c_i <= ||A||^(l+1)), and this division is not a
+                declaration. F_i and the coefficient of the sample of t_k are arbitrary.
+                memory_nodes is the statement for any finite set of sample instants. Real normed
+                spaces of any dimension.
+
+[070] Section 4.2, text: the samples can show more than their derivatives                       FULL
+     label    : (text)
+     statement: Where the maps are dependent, the samples of a positive macro step can show more
+                than their derivatives: the bound can be smaller than the leading value, not larger.
+     Lean     : LeadingValueScheme.lean: visBound_le_leading_nodes
+                KernelPerturbation.lean: exists_generalizedInverse
+     note     : The upper bound f_i <= H^(l+1) c_i^sigma + (c_2 + 2 ||R|| c_1 ||D||) H^(l+2) for any
+                generalised inverse R of the stacked map. The example of the cubic through two
+                samples of an output and of its rate is not formalised.
+
+[071] Theorem 4.5 (order barrier) (i), (30)                                                     FULL
+     label    : cor:barrier, eq:orderlmain
+     statement: For every rule of subsystem i in a scheme with l held samples, in any order of
+                execution, with arbitrary starting values and arbitrary rules of the other
+                subsystems, if the maps of Theorem 4.4 (i) are independent: eps_K >= 0.35 /
+                (5.3 ||A||) c_i^sigma H^l (1 - O(H)), K the number of macro steps in an interval of
+                the length 1/(2 ||A||).
+     Lean     : OrderBarrierAll.lean: order_barrier_all, order_barrier_all_floor,
+                  order_barrier_all_scheme, orderBarrierLead (def), orderBarrierRem (def),
+                  orderBarrierDefect (def), orderBarrierCoef (def), ruleNew (def), ruleOld (def),
+                  rowDefect_rule, row_of_rule, norm_ruleNew_le, norm_ruleOld_le, run_fraction_mono,
+                  barrier_all_arith
+     explicit : A bounded right inverse R of the stacked map (the independence); 0 < H <= 1;
+                H ||A_i|| <= 1; c_1 H ||R|| <= 1/2; l >= 1; K H ||A|| <= 1/2 < (K + 1) H ||A||, or
+                K = floor(1/(2 H ||A||)) with A != 0.
+     note     : delta >= 0.35 (lambda H^l - kappa H^(l+1)) / (5.3 ||A||) for every upper bound delta
+                of the relative errors (C7), with lambda = c_i^sigma (orderBarrierLead) and the
+                explicit kappa = orderBarrierRem, which depends on ||R|| and ||A||: the factor 1 -
+                O(H) of the paper is 1 - (kappa/lambda) H. Old and new samples may be mixed. The
+                form with the least upper bound is not a separate declaration.
+
+[072] Theorem 4.5 (ii), (30)                                                                    FULL
+     label    : cor:barrier, eq:orderlmain
+     statement: The same bound for every rule with coefficients as in Theorem 4.4 (ii), if the
+                samples are all old or all new, with c_i^sigma = |gamma_l^sigma| c_i.
+     Lean     : RunOrderRowLead.lean: run_order_row_lead, run_order_row_lead_floor,
+                  run_order_row_late, run_order_row_late_floor, run_order_row_lead_of_defect
+     explicit : 2 l H ||A|| <= 1; K as in the row before; bounds nbar on the coefficients of the new
+                samples and mbar on those of the samples of the instants before t_k.
+     note     : delta >= 0.35 (|gamma| c_i H^l - kappa H^(l+1)) / (2 b ||A||) with b = 2.65
+                (1 + nbar) + 1.42 mbar l (l - 1), the constant of Lemma A.1, in the place of 2.65: 2
+                b stands where the paper has 5.3. Since nbar and mbar are at most w H, b = 2.65 +
+                O(H); this last step is not a declaration.
+
+[073] Theorem 4.5, last sentence: one held sample                                            PARTIAL
+     label    : cor:barrier
+     statement: With one held sample (i) applies to every subsystem, and c_i^sigma = (1/2) ||Pi_i
+                A_sig A on V_i^0|| by (23).
+     Lean     : OrderBarrierAll.lean: order_barrier_all
+                LeadingValueOne.lean: exists_rightInverse_stackedDeriv_one, leadingMap_one
+                RunOrderRowLead.lean: HeldScheme.Consistent.first_order_row_lead,
+                  HeldScheme.Consistent.norm_row_defect_ge
+     note     : Formalised: the three ingredients (the barrier for l = 1; the right inverse of the
+                stacked map from surjective outputs of the partners; the leading map for l = 1 as
+                -(1/2) Pi_i A_sig A). Their combination into one statement is not a declaration. For
+                a scheme in the block form (C2) and two subsystems i != j that are not partners,
+                first_order_row_lead gives, in the operator norm (the runs that start on the exact
+                value), max over k <= K of ||X^k - U^k|| >= 0.35 (||[A_sig A]_ij|| H - kappa' H^2) /
+                (4 b_i ||A||) with b_i = 2.65 (1 + nbar).
+
+---------------------- Section 5: Energy and damping: the order of execution -----------------------
+
+[074] Proposition 5.1 (the numerical dissipation of the half step), (31): the first form        FULL
+     label    : prop:parts, eq:dissipation
+     statement: The zero-order hold has -x^T Delta_R x = (1/2) H x^T A_sig A x up to O(H^2 |x|^2).
+     Lean     : HalfStepDissipation.lean: HeldScheme.halfStepDissipation (def),
+                  HeldScheme.norm_numDissipation_zoh_sub_le
+     explicit : 0 < H, H ||A|| <= 1/24, s H ||A|| <= 1/6 (C3).
+     note     : ||Delta_R + (H/2) sym(A_sig A)|| <= (37 + 220 s + 53 s^2 + 54 s^3) ||A||^3 H^2, in
+                every order of execution. This form needs no power-conjugate ports.
+
+[075] Proposition 5.1, (31): the form at the ports                                              FULL
+     label    : prop:parts, eq:dissipation
+     statement: x^T A_sig A x = sum_i y_i^T sum_k sig_ik L_ik y_k' with the outputs y_i = C_i x and
+                their rates y_k' = C_k A x.
+     Lean     : PortDissipation.lean: portOut (def), HeldScheme.signedPorts (def),
+                  HeldScheme.signedCoupling_eq_ports,
+                  HeldScheme.inner_signedCoupling_mul_self_ports, HeldScheme.dotProduct_signedPorts,
+                  HeldScheme.abs_numDissipation_zoh_ports_le, HeldScheme.skew_of_ports
+     explicit : B and L are given as data, with the hypothesis that the coupling blocks of A are B_i
+                L_ik B_k^T and that the column of every port lies on the states of its owner.
+     note     : The identity is exact, for every x and every assignment of stages, and holds for
+                every interconnection L, not only for a skew one. With it, |x^T Delta_R x + (H/2)
+                y^T L_sig y'| <= (37 + 220 s + 53 s^2 + 54 s^3) ||A||^3 H^2 |x|^2 for the zero-order
+                hold.
+
+[076] Proposition 5.1, (31): the form with the two rates                                        FULL
+     label    : prop:parts, eq:dissipation
+     statement: (1/2) H x^T A_sig A x = (1/2) H sum_k (|a_k^- x|^2 - |a_k^+ x|^2) + (1/2) H x^T
+                A_sig A_0 x.
+     Lean     : HalfStepDissipation.lean: HeldScheme.driveAfter (def), HeldScheme.driveOther (def),
+                  HeldScheme.inner_signedCoupling_mul_coupling_self,
+                  HeldScheme.inner_halfStepDissipation_self,
+                  HeldScheme.abs_numDissipation_zoh_sub_le
+                PortDissipation.lean: HeldScheme.sum_drive_sub_eq_ports
+     explicit : Power-conjugate ports (C4).
+     note     : The identity is exact. For the zero-order hold, with the remainder of the first row:
+                |x^T Delta_R x - ((H/2) sum_k (|a_k^+ x|^2 - |a_k^- x|^2) - (H/2) x^T A_sig A_0
+                x)| <= (37 + 220 s + 53 s^2 + 54 s^3) ||A||^3 H^2 |x|^2.
+
+[077] Proposition 5.1: what a scheme changes                                                    FULL
+     label    : prop:parts
+     statement: A scheme changes Delta_R, to leading order, by a symmetric matrix with blocks within
+                the subsystems and between partners only.
+     Lean     : HalfStepDissipation.lean: HeldScheme.schemeChange (def),
+                  HeldScheme.Consistent.norm_numDissipation_add_sym_sub_le,
+                  HeldScheme.Consistent.inner_sym_schemeChange_eq_zero
+     note     : ||Delta_R + sym G + (H/2) sym(A_sig A)|| <= (K + s C_3) H^2 with G the change of the
+                scheme (its first two terms in (12), divided by H), and <x, sym G y> = 0 for x and y
+                on different subsystems that are not partners in either direction. Range of (C3).
+
+[078] Proposition 5.1, (32)                                                                     FULL
+     label    : prop:parts, eq:parts
+     statement: For every scheme and i != j that are not partners: [Delta_R]_ij = -(1/2) H sum_k
+                tau_k A_ik A_kj + O(H^2), tau_k = (sig_ik + sig_jk)/2.
+     Lean     : DifferenceLeadHalfStep.lean: HeldScheme.Consistent.numDissipation_block,
+                  HeldScheme.Consistent.difference_forced
+                ForcedParts.lean: HeldScheme.Consistent.forced_sym,
+                  HeldScheme.Consistent.forced_antisym
+     explicit : Power-conjugate ports (C4); the range of (C3).
+     note     : |<x, Delta_R y> + (H/4) <x, A (sgn_i + sgn_j) A y>| <= (K + C) H^2 |x| |y| for x on
+                i and y on j, where sgn_i is the diagonal matrix of the signs sig_ik, so that sgn_i
+                + sgn_j = 2 tau. forced_sym and forced_antisym are the forms for X - U.
+
+[079] Proposition 5.1, (33): the diagonal block                                                 FULL
+     label    : prop:parts, eq:negdamping
+     statement: With partner weights only, [Delta_R]_ii = (1/2) H sum_k sig_ik A_ki^T A_ki + O(H^2).
+     Lean     : HalfStepDissipation.lean: HeldScheme.Consistent.numDissipation_diag,
+                  HeldScheme.abs_numDissipation_zoh_diag_le, HeldScheme.sum_drive_eq_of_support
+     explicit : Power-conjugate ports; subsystem i is not its own partner and its block of F is that
+                of exp(H A_i); the range of (C3).
+     note     : For every consistent scheme, whatever the coefficients of the partner samples, and
+                for the zero-order hold with the constant 37 + 220 s + 53 s^2 + 54 s^3.
+
+[080] Proposition 5.1, (33): the total numerical damping                                        FULL
+     label    : prop:parts, eq:negdamping
+     statement: With partner weights only, nu = -H times the sum of ||A_ik||_F^2 over the links {i,
+                k} at one stage, + O(H^2).
+     Lean     : ZeroOrderHoldDamping.lean: HeldScheme.Consistent.abs_numDamping_add_links_le,
+                  HeldScheme.abs_numDamping_zoh_add_links_le,
+                  HeldScheme.Consistent.abs_numDamping_add_links_le_of_stage_eq
+                DifferenceLeadHalfStep.lean: HeldScheme.Consistent.abs_numDamping_partner_weights_le
+                StoredEnergy.lean: HeldScheme.trace_signedCoupling_mul
+     explicit : Power-conjugate ports; F = exp(H A_0); no subsystem is its own partner; the range of
+                (C3).
+     note     : |nu + (H/2) sum over all pairs of states p, q of (A_par p q)^2| <= n C H^2, n the
+                number of states; the double sum counts each link twice and is the Frobenius sum of
+                the paper (the Frobenius norm is not an object of the library). For the zero-order
+                hold C = (41 + 269 s + 54 s^2) ||A||^3.
+
+[081] Proposition 5.1: the determinant of a sequential scheme                                SPECIAL
+     label    : prop:parts
+     statement: In a sequential scheme det X = product of det F_i for all coefficients.
+     Lean     : ZeroOrderHoldDamping.lean: HeldScheme.det_X_eq_det_F
+                InfoForm.lean: det_infoStep_block, det_infoStep_output, det_infoStep_gs
+     note     : Special case: distinct stages (C8), where no two subsystems share a stage. A
+                sequential scheme in which two subsystems that are not partners share a stage is not
+                covered.
+
+[082] Proposition 5.1: nu = 0 exactly                                                        SPECIAL
+     label    : prop:parts
+     statement: In a sequential scheme nu = 0 exactly with partner weights only.
+     Lean     : ZeroOrderHoldDamping.lean: HeldScheme.numDamping_eq_zero_of_sequential,
+                  HeldScheme.numDamping_zoh_eq_zero_of_sequential
+     explicit : H != 0 and ||X - I|| < 1, so that the logarithm series exists.
+     note     : Special case: distinct stages, as in the row before. Neither power-conjugate ports
+                nor consistency is used.
+
+[083] Section 5.1, text: the numerical interconnection between non-partners                     FULL
+     label    : (text)
+     statement: [Delta_J]_ij = (1/4) H sum_k (sig_ik - sig_jk) A_ik A_kj + O(H^2).
+     Lean     : DifferenceLeadHalfStep.lean: HeldScheme.Consistent.numInterconnection_block
+                LegRule.lean: HeldScheme.sg_eq_sg_of_iff, HeldScheme.sg_eq_neg_sg_of_not_iff
+     explicit : Power-conjugate ports; the range of (C3).
+     note     : "Runs between" is the statement that the two signs are opposite.
+
+[084] Section 5.1, text: between partners nothing is forced                                  PARTIAL
+     label    : (text)
+     statement: The subsystem that hides states behind its port cancels the part of the error (19)
+                that enters the numerical dissipation.
+     Lean     : OneSided.lean: HeldScheme.Consistent.opposite_block,
+                  HeldScheme.Consistent.returned_block, HeldScheme.Consistent.one_sided_sym,
+                  return_identity
+     note     : Formalised: the opposite block of X - U, and that the two blocks cancel to the order
+                H^3 if the coefficient row on the hidden states returns the error; this row is a
+                hypothesis. The algebra with the port matrices is return_identity. Not formalised:
+                that the block of sym(A_sig A) between two partners vanishes between the states that
+                the two outputs do not show.
+
+[085] Lemma 5.2 (injection or damping), (34): the two inequalities                              FULL
+     label    : thm:triple, eq:triple
+     statement: For orthogonal unit vectors e, e' with the mean mubar = (e^T Delta_R e + e'^T
+                Delta_R e')/2: iota >= |e^T Delta_R e'| - mubar and mu >= |e^T Delta_R e'| + mubar.
+     Lean     : PairTrade.lean: pair_trade_iota, pair_trade_mu, pair_trade_spread,
+                  pair_trade_iota_matrix, pair_trade_mu_matrix, pair_trade_spread_matrix,
+                  pair_trade_iota_opE, pair_trade_mu_opE, abs_inner_add_inner_add_le_mu
+     note     : For every symmetric operator on a real inner product space and every bound iota, mu
+                of its quadratic form (C5).
+
+[086] Lemma 5.2: equality for one pair                                                          NONE
+     label    : thm:triple
+     statement: Equality holds in both inequalities for one such pair.
+     note     : Not stated (it needs the eigenvectors of the two extreme eigenvalues).
+
+[087] Lemma 5.2: the pair in the state spaces of two subsystems                              PARTIAL
+     label    : thm:triple
+     statement: For subsystems i != j the pair can be chosen in their state spaces with |e^T Delta_R
+                e'| = ||[Delta_R]_ij||, so that mu + iota >= 2 ||[Delta_R]_ij||.
+     Lean     : PairTrade.lean: HeldScheme.pair_trade_iota_blocks, HeldScheme.pair_trade_mu_blocks
+                AmountLead.lean: two_mul_abs_inner_opE_le_spread
+                ForcedNorm.lean: HeldScheme.norm_opE_cblock_le_iff
+     note     : Formalised: the two inequalities, and 2 |<x, Delta_R y>| <= mu + iota, for every
+                unit vector x of subsystem i and y of subsystem j. By norm_opE_cblock_le_iff the
+                bound for all such pairs is the bound for the norm of the block. Not a declaration:
+                that one pair attains the norm, and the inequality written with the norm.
+
+[088] Section 5.2, text after Lemma 5.2: the spread of the numerical dissipation             PARTIAL
+     label    : (text)
+     statement: The sum mu + iota is twice the largest entry of Delta_R between two orthogonal
+                states.
+     Lean     : SpreadLaw.lean: spread_law_symm, spread_law, two_mul_abs_inner_le_spread
+                AmountLead.lean: two_mul_abs_inner_opE_le_spread
+     note     : Formalised: mu + iota >= 2 |e^T Delta_R e'| for every orthonormal pair. Not
+                formalised: that the largest such entry is attained with equality.
+
+[089] Theorem 5.3 (the amount), (35)                                                            FULL
+     label    : cor:amount, eq:amount
+     statement: For i != j that are not partners: mu + iota >= H ||sum_k tau_k A_ik A_kj|| - O(H^2).
+     Lean     : AmountLead.lean: HeldScheme.Consistent.amount_spread,
+                  HeldScheme.Consistent.amount_block, amountC (def),
+                  HeldScheme.Consistent.amount_spread_jacobi
+                PairTrade.lean: HeldScheme.Consistent.amount_pair_iota,
+                  HeldScheme.Consistent.amount_pair_mu
+     explicit : Power-conjugate ports; the range of (C3).
+     note     : (H/2) |<x, A (sgn_i + sgn_j) A y>| - K H^2 <= mu + iota for all unit vectors x of i
+                and y of j; the supremum of the left side over x and y is H times the norm of the
+                paper. K = amountC a b c ||A|| depends on the constants of consistency and on ||A||
+                only. amount_pair_iota and amount_pair_mu are the two inequalities of Lemma 5.2 with
+                this entry. In a Jacobi scheme the left side is H |<x, A^2 y>| - K H^2
+                (amount_spread_jacobi).
+
+[090] Theorem 5.3: scalar stores through a single store                                         FULL
+     label    : cor:amount
+     statement: For scalar stores that interact through a single store k that does not run between
+                them the right-hand side is H |A_ik A_kj| - O(H^2).
+     Lean     : AmountLead.lean: HeldScheme.Consistent.amount_spread_partner,
+                  HeldScheme.abs_inner_sgn_add_partner
+     note     : Stated for subsystems with any number of states that interact through one common
+                partner k with equal signs toward it: H |<x, A mask_k A y>| - K H^2 <= mu + iota.
+
+[091] Section 5.2, text after Theorem 5.3: the two readings                                     FULL
+     label    : (text)
+     statement: To leading order, a scheme with mubar = 0 injects at the rate iota >= (1/2) H |A_ik
+                A_kj| and adds as much damping; a scheme that never injects energy adds the damping
+                mu >= H |A_ik A_kj|.
+     Lean     : PairTrade.lean: HeldScheme.Consistent.amount_pair_iota,
+                  HeldScheme.Consistent.amount_pair_mu
+                AmountLead.lean: HeldScheme.Consistent.amount_rate_of_injection_nonpos
+     note     : With the remainder K H^2. The first reading is the case of a vanishing mean in the
+                two inequalities; the second is amount_rate_of_injection_nonpos (iota <= 0).
+
+[092] Corollary 5.4 (graph and order) (i): Jacobi scheme                                        FULL
+     label    : cor:graph
+     statement: In a Jacobi scheme no subsystem runs between two of its partners.
+     Lean     : GraphOrder.lean: HeldScheme.sg_of_jacobi
+                LegRule.lean: HeldScheme.sg_eq_sg_of_iff, HeldScheme.sg_eq_neg_sg_of_not_iff
+     note     : In a Jacobi scheme all signs are -1; "k runs between i and j" is sig_jk = -sig_ik.
+
+[093] Corollary 5.4 (i): three or more partners                                                 FULL
+     label    : cor:graph
+     statement: In any order of execution a subsystem with three or more partners does not run
+                between at least one pair of them.
+     Lean     : GraphOrder.lean: HeldScheme.exists_pair_same_side,
+                  HeldScheme.Consistent.exists_pair_forced
+     note     : Among any three subsystems two have the same sign toward k. exists_pair_forced draws
+                the consequence for X - U when the three interact through one state of k only.
+
+[094] Corollary 5.4 (ii)                                                                     SPECIAL
+     label    : cor:graph
+     statement: An order of execution with distinct stages in which every common partner of two
+                subsystems that are not partners runs between them exists if and only if the
+                coupling graph is a proper interval graph.
+     Lean     : GraphOrder.lean: path_between, HeldScheme.sum_eq_zero_of_between,
+                  HeldScheme.Consistent.sym_of_between, HeldScheme.Consistent.path_sym,
+                  ScalarNet.gs_path_sym
+     note     : Special case: the path executed from end to end. Every common partner then runs
+                between, the sum of tau_k A_ik A_kj vanishes, and no pair is forced to trade. The
+                characterisation by proper interval graphs, which the paper takes from a cited
+                theorem of graph theory, is not formalised in either direction.
+
+[095] Proposition 5.5 (energy-conserving sweep), (36): the sweep as a scheme                    FULL
+     label    : prop:sweep, eq:sweep
+     statement: On a lossless chain of n scalar stores the product of plane rotations is the
+                one-step map of a sequential scheme with local gains that executes the stores from 1
+                to n, with F_1 = cos th_1, F_k = cos th_k / cos th_(k-1), F_n = 1 / cos th_(n-1).
+     Lean     : Sweep.lean: sweep (def), sweepF (def), sweepG (def), planeRot (def),
+                  sweep_eq_infoStep, one_sub_infoNew_mul_sweep, sweepF_pos,
+                  ScalarNet.exists_gsStep_eq_sweep
+     explicit : cos th_k != 0 for the identity; cos th_k > 0 (angles in (-pi/2, pi/2)) for positive
+                coefficients and for the realisation by local gains.
+     note     : For chains of any length n >= 2 and all angles; the realisation by local gains and
+                weights on the links of the chain holds for every network of scalar stores and every
+                H > 0.
+
+[096] Proposition 5.5: orthogonality                                                            FULL
+     label    : prop:sweep
+     statement: The sweep is orthogonal.
+     Lean     : Sweep.lean: sweep_transpose_mul_self, planeRot_transpose_mul_self
+                DampedChain.lean: det_sweep
+
+[097] Proposition 5.5: conservation of the energy                                            PARTIAL
+     label    : prop:sweep
+     statement: The co-simulation conserves the energy at every communication point, Delta_R = 0,
+                and its difference is a numerical interconnection.
+     Lean     : LosslessEnergy.lean: energy_conserved_iff_orthogonal, lossless_energy_iff_small_step
+     note     : Formalised for every one-step map: the energy is conserved at every communication
+                point exactly if X is orthogonal, and for a lossless system with ||X - I|| <= 1/3
+                exactly if Delta_R = 0. With the orthogonality of the sweep this gives the statement
+                for ||X - I|| <= 1/3; it is not instantiated for the sweep in one declaration, and
+                Delta_R = 0 beyond ||X - I|| <= 1/3 is not formalised.
+
+[098] Section 5.3, text after Proposition 5.5: the damped sweep                              PARTIAL
+     label    : (text)
+     statement: On the damped chain the map exp(-H R/2) X exp(-H R/2) has nu = 0 exactly.
+     Lean     : DampedChain.lean: det_exp_mul_sweep_mul_exp, ScalarNet.exists_gsStep_eq_scaled_sweep
+     note     : Formalised: its determinant is exp(-H tr R), the determinant of the monolithic step,
+                and it is the one-step map of a sequential scheme with positive coefficients. Not
+                formalised: the reading as a splitting, and the numbers.
+
+[099] Example 5.6 (the chain of three, by order of execution)                                   NONE
+     label    : ex:order
+     note     : Numbers; computed, not proved.
+
+[100] Section 5.4, text: the two parts of the signed coupling                                   FULL
+     label    : (text)
+     statement: A_sig = A_seq - A_par with A_seq = sym A_sig and A_par = -skew A_sig; A_seq consists
+                of the blocks sig_ik A_ik between subsystems at different stages and A_par of the
+                blocks A_ik between subsystems at the same stage.
+     Lean     : StoredEnergy.lean: HeldScheme.seqCoupling (def), HeldScheme.parCoupling (def),
+                  HeldScheme.seqCoupling_apply, HeldScheme.parCoupling_apply,
+                  HeldScheme.signedCoupling_eq, HeldScheme.seqCoupling_transpose,
+                  HeldScheme.parCoupling_transpose
+                SignedCouplingParts.lean: HeldScheme.sym_signedCoupling,
+                  HeldScheme.skw_signedCoupling
+     explicit : Power-conjugate ports for the symmetry of the two parts.
+
+[101] Proposition 5.7 (energy stored and energy created): Q = sym E                             FULL
+     label    : prop:lent
+     statement: Q = sym E = sym Psi_0 - (1/2) H A_seq.
+     Lean     : MidpointEnergySkew.lean: MidpointEnergy.zohQSym (def)
+                MidpointEnergyZOH.lean: MidpointEnergy.zohQ (def), MidpointEnergy.zohPsi (def)
+                SignedCouplingParts.lean: HeldScheme.sym_midpointE,
+                  HeldScheme.sym_midpointE_eq_zohQ, HeldScheme.skw_midpointE,
+                  HeldScheme.midpointPsi_eq_zohPsi
+     explicit : Power-conjugate ports.
+
+[102] Proposition 5.7, (37)                                                                     FULL
+     label    : prop:lent, eq:balance
+     statement: The zero-order hold satisfies at every macro step (1/2) x^T Q x from k to k+1 = -H
+                xbar^T R xbar + (1/2) H <A_par xbar, d> - xbar^T skew(Psi_0) d.
+     Lean     : MidpointEnergySkew.lean: MidpointEnergy.zohScheme_energy_balance_skew,
+                  MidpointEnergy.zoh_energy_balance_skew,
+                  MidpointEnergy.zoh_energy_balance_skew_diss, MidpointEnergy.energy_balance_skew
+     explicit : Power-conjugate ports (C4); an invertible phi (C6).
+     note     : Exact, with the three terms, for every assignment of stages and subsystems with any
+                number of states. zohScheme_energy_balance_skew has H xbar^T A xbar in the place of
+                the first term; zoh_energy_balance_skew_diss has -H xbar^T R xbar with R = -sym A.
+
+[103] Proposition 5.7: the last term                                                         PARTIAL
+     label    : prop:lent
+     statement: The last term vanishes if every A_i is symmetric or skew and is O(H^3 |x^k|^2)
+                otherwise.
+     Lean     : MidpointEnergySkew.lean: MidpointEnergy.skw_zohPsi_of_skew,
+                  MidpointEnergy.skw_zohPsi_of_symm, MidpointEnergy.psi_transpose_of_symm
+                MidpointEnergy.lean: MidpointEnergy.psi_transpose_of_skew
+     note     : Formalised: skew(Psi_0) = 0 if A_0 = diag(A_i) is symmetric, and if it is skew. Not
+                formalised: the case in which some A_i are symmetric and others skew, and the bound
+                O(H^3 |x^k|^2).
+
+[104] Proposition 5.7: the second term                                                       PARTIAL
+     label    : prop:lent
+     statement: The second term is absent exactly if no two partners share a stage.
+     Lean     : ReversedOrder.lean: HeldScheme.parCoupling_eq_zero_of_partner
+                StoredEnergy.lean: HeldScheme.parCoupling_eq_zero, HeldScheme.parCoupling_apply
+     note     : Formalised: A_par = 0 if no two partners share a stage. The converse is not a
+                declaration; A_par consists of the blocks between subsystems at one stage
+                (parCoupling_apply).
+
+[105] Proposition 5.7: the invariant                                                            FULL
+     label    : prop:lent
+     statement: In a sequential scheme with lossless subsystems X^T Q X = Q, on every coupling
+                graph.
+     Lean     : MidpointEnergyZOH.lean: MidpointEnergy.zohScheme_invariant_pow,
+                  MidpointEnergy.zoh_invariant, MidpointEnergy.zoh_invariant_pow,
+                  MidpointEnergy.zohScheme_energy_balance_lossless
+     explicit : A^T = -A (lossless subsystems and power-conjugate ports); no two partners share a
+                stage; an invertible phi (C6).
+     note     : (X^k)^T Q X^k = Q for every k, with Q = Psi_0 - (1/2) H A_seq.
+
+[106] Section 5.4, text: the bound on the energy                                             PARTIAL
+     label    : (text)
+     statement: While Q is positive definite the energy never exceeds lambda_max(Q)/lambda_min(Q)
+                times its initial value; without dynamics of the subsystems Q = I - (1/2) H A_seq
+                and the factor is at most (1 + rho)/(1 - rho) with rho = (1/2) H ||A_seq|| < 1.
+     Lean     : MidpointEnergyZOH.lean: MidpointEnergy.zohScheme_norm_pow_sq_le,
+                  MidpointEnergy.zohQ_of_blockDiag_eq_zero
+                StoredEnergy.lean: HeldScheme.stored_invariant_pow, HeldScheme.stored_norm_pow_sq_le
+     note     : Formalised: |X^k x|^2 <= (lmax/lmin) |x|^2 for bounds 0 < lmin, lmax of the
+                quadratic form of Q; Q = I - (1/2) H A_seq for A_0 = 0; and the factor
+                (1 + rho)/(1 - rho) for every scheme with F = I and G^old C = -(G^new C)^T, where
+                Q = I - (1/2)(N + N^T) and ||N + N^T|| <= 2 rho. Not a declaration: N + N^T = H
+                A_seq for the zero-order hold, which joins the last two.
+
+[107] Section 5.4, text: E = Q, and the loss of stability                                    PARTIAL
+     label    : (text)
+     statement: For lossless subsystems in a sequential scheme E is Q; the co-simulation first loses
+                stability at the macro step at which Q becomes singular, where it has the eigenvalue
+                -1; without dynamics of the subsystems this is H lambda_max(A_seq) = 2.
+     Lean     : SignedCouplingParts.lean: HeldScheme.sym_midpointE_of_skew,
+                  HeldScheme.skw_midpointE_of_skew
+                MidpointStability.lean: HeldScheme.zoh_neg_one_eigenvalue_iff
+                StoredEnergy.lean: HeldScheme.signedCoupling_eq_seqCoupling
+     note     : Formalised: sym E = Q and skew E = (1/2) H A_par for lossless subsystems, so that
+                E = Q without a link within a stage; -1 is an eigenvalue of X exactly if det E = 0.
+                Not formalised: the threshold H lambda_max(A_seq) = 2 and the values h = 2 and
+                h = sqrt 2.
+
+[108] Section 5.4, text: on a graph without a cycle the order changes no eigenvalue             FULL
+     label    : (text)
+     statement: On a coupling graph without a cycle the order of execution of a sequential scheme
+                changes no eigenvalue if its coefficients do not depend on the order.
+     Lean     : TreeDeterminant.lean: charpoly_infoStep_eq_of_isAcyclic
+                TreeDeterminantScheme.lean: HeldScheme.charpoly_zoh_restage_eq
+                SimilarOrdersBlock.lean: HeldScheme.exists_units_conj_X
+     note     : This is the last row of Corollary 3.5. The sentence on coupling graphs with a cycle
+                is not formalised.
+
+-------------------- Section 6: The reaction: the hold as a damper at the port ---------------------
+
+[109] Proposition 6.1 (the reaction), (38)                                                      FULL
+     label    : thm:access, eq:gi
+     statement: With partner weights only, on every network and in every order of execution,
+                [Delta_R]_ii = B_i K_i B_i^T + O(H^2) with K_i = (1/2) H sum_k sig_ik L_ki^T B_k^T
+                B_k L_ki.
+     Lean     : HalfStepDissipation.lean: HeldScheme.Consistent.numDissipation_diag,
+                  HeldScheme.abs_numDissipation_zoh_diag_le
+                ReactionGain.lean: own_output_gain
+                ReactionDiag.lean: HeldScheme.Consistent.reaction_partner_weights
+                ReactionSV.lean: HeldScheme.Consistent.reaction_quadratic
+     explicit : Power-conjugate ports; subsystem i is not its own partner; the range of (C3).
+     note     : In two declarations: the diagonal block of Delta_R as (H/2) sum_k sig_ik A_ki^T A_ki
+                with its remainder (the row of (33)), and the identity H B K B^T = (1/2) H^2 sum_k
+                sig_k A_k^T A_k for A_k = B_k L_k B^T (own_output_gain), with B and L as data.
+
+[110] Proposition 6.1: the two inequalities                                                     NONE
+     label    : thm:access
+     statement: iota >= lambda_max(-B_i K_i B_i^T) - O(H^2) and mu >= lambda_max(B_i K_i B_i^T) -
+                O(H^2).
+     related  : ReactionSV.lean: HeldScheme.Consistent.injection_first,
+                  HeldScheme.Consistent.damping_last, HeldScheme.Consistent.smin_last
+     note     : Not stated for iota and mu. Related statements for the relative one-step map D: for
+                a subsystem that runs before all of its partners, ||D|| - 1 >= (1/2) H^2 sum_k |A_ki
+                e|^2 - C H^3, and for one that runs after all of them the same bound for ||D^(-1)||
+                - 1.
+
+[111] Proposition 6.1: the gains                                                                FULL
+     label    : thm:access
+     statement: A scheme with the local gains K_i, or with the constant weights W_ii = K_i on the
+                own output, has the block (i, i) of X - U of the order H^3 for every subsystem.
+     Lean     : OwnOutputBlock.lean: HeldScheme.Consistent.own_output_gain_block,
+                  HeldScheme.Consistent.own_output_weight_block,
+                  HeldScheme.Consistent.own_output_block_skew,
+                  HeldScheme.Consistent.own_output_local_gain,
+                  HeldScheme.Consistent.own_output_weight_integral
+                ReactionGain.lean: own_output_gain
+     explicit : Power-conjugate ports; subsystem i is not its own partner.
+     note     : Both realisations, as hypotheses on the block i of F: that of exp(H (A_i + E_i))
+                with E_i = (H/2) sum_k sig_ik A_ki^T A_ki = B_i K_i B_i^T (local gain), or that of
+                exp(H A_i) + (integral of exp((H - t) A_i) over [0, H]) E_i (constant weight on the
+                own output). The coefficients of the partner samples are those of any consistent
+                scheme. The bound on the norm of the block is explicit.
+
+[112] Example 6.2 (one oscillator, four choices of port)                                        NONE
+     label    : ex:ports
+     note     : Numbers and qualitative statements on four partitions of one oscillator; computed,
+                not proved.
+
+---------------------------------------- Appendix A: Proofs ----------------------------------------
+
+[113] (39)                                                                                      FULL
+     label    : eq:etam
+     statement: ||eta_m (H A)^m on V^[m]|| <= ||T_i|| + (kappa' ||A|| + kappa'' w) ||A||^(m+1)
+                H^(m+2) for 0 <= m <= l.
+     Lean     : MemoryLead.lean: memory_key_step, memE_le
+                MemoryLate.lean: node_key_step
+                MemoryLateConstants.lean: nodeE_le
+     note     : In the form |H^m nu_m A^m v - H^(m+1)/(m+1)! Pi_i A^(m+1) v| <= (||T_i|| + e_m) |v|
+                for v in V^[m], with e_m bounded for H ||A|| <= 1 by memE_le and nodeE_le.
+
+[114] (40)                                                                                      FULL
+     label    : eq:multistep
+     statement: The rule of subsystem i has the form (Pi_i - N_i) x^(k+1) = sum over q < l of M_i,q
+                x^(k-q), and its local defect is T_i = (Pi_i - N_i) U - sum_q M_i,q U^(-q).
+     Lean     : RunOrderRow.lean: rowDefect (def), rowBalance (def)
+                OrderBarrierAll.lean: ruleNew (def), ruleOld (def), row_of_rule, rowDefect_rule
+                RunOrderRowLead.lean: rowDefect_eq_localDefect, rowDefect_eq_lateDefect
+     note     : The recursion is a hypothesis of the theorems on a run; row_of_rule and
+                rowDefect_rule prove that the rule (6) of one subsystem has this form, with this
+                defect, for every l and for old and new samples mixed.
+
+[115] Lemma A.1 (order over a run), (41)                                                        FULL
+     label    : thm:runorder, eq:runorder
+     statement: If the sequences x^k satisfy (40) for one subsystem i, with arbitrary starting
+                values and arbitrary rules of the other subsystems, K >= l, K H ||A|| <= 1/2,
+                ||N_i|| <= nbar and ||M_i,q|| <= mbar for q >= 1, then eps_K >= 0.35 T_K / (b + T_K)
+                with T_K = (K - l + 1) ||T_i|| and b = 2.65 (1 + nbar) + 1.42 mbar l (l - 1).
+     Lean     : RunOrderRow.lean: run_order_row, run_order_row_isLUB, exists_run_order_row,
+                  run_order_row_of_le, norm_rowDefect_le_of_runs, norm_rowBalance_le
+                RunOrderFraction.lean: run_order_fraction, run_order_fraction_isLUB,
+                  exists_run_order_fraction, run_fraction_constants
+     explicit : 0 <= H and l >= 1, which the paper leaves implicit; ||Pi_i|| <= 1.
+     note     : Exactly the statement of the paper, for every upper bound delta of the relative
+                errors (run_order_row), for their least upper bound eps_K (run_order_row_isLUB), and
+                for single sequences (exists_run_order_row). The assignment of the sequences to the
+                initial states need not be linear; a complete normed space; no stability is assumed.
+                run_order_fraction is the same bound for the whole recursion in place of one row.
+
+[116] (42)                                                                                      FULL
+     label    : eq:coefbound
+     statement: Where the maps are independent, ||G_ij^q C_j|| <= kappa_3 (H + ||T_i|| H^(1-l)).
+     Lean     : BoundedCoefficients.lean: norm_coeff_comp_le, norm_coeff_comp_le_scheme,
+                  norm_coeff_le, norm_moment_le, coefConst (def), coefBase (def)
+     explicit : The bounded right inverse R of the stacked map; 0 < H <= 1, H ||A|| <= 1,
+                H ||A_i|| <= 1, c_1 H ||R|| <= 1/2.
+     note     : For every number of held samples and every order of execution, with the explicit
+                kappa_3 = coefConst, which depends on ||R|| and on the norms of the coupling and
+                output maps.
+
+[117] Appendix A.3, proof: the determinant                                                   SPECIAL
+     label    : (text)
+     statement: Ordered by stage, I - G^new C is block unit lower triangular and F + G^old C block
+                upper triangular with the diagonal blocks F_i; with partner weights det
+                X = exp(H tr A) = det U.
+     Lean     : StoredEnergy.lean: HeldScheme.det_one_sub_N
+                ZeroOrderHoldDamping.lean: HeldScheme.det_X_eq_det_F
+                DetExp.lean: det_exp
+     note     : det(I - G^new C) = 1 for every assignment of stages; det X = det F for distinct
+                stages (the special case of the row on the determinant in Proposition 5.1).
+
+[118] Appendix A.4, proof of Proposition 5.5                                                    FULL
+     label    : (text)
+     statement: Store k advances on its own state, on the new value of store k - 1 and on the old
+                value of store k + 1; the coefficients F_k are positive.
+     Lean     : Sweep.lean: infoNew_sweepG_apply, infoOld_sweepG_apply, one_sub_infoNew_mul_sweep,
+                  sweepF_pos, sweepInv (+)
+
+----------------------------------- Examples, tables and figures -----------------------------------
+
+Example 2.3, Example 4.3, Example 5.6, Example 6.2, the numbers of the two tables of Section 7 and
+the numbers in the captions of the figures are computed, not proved; the code that computes them is
+published with the library. Equation (4), the running example, fixes notation and has no row.
+
+---------------------------------------------- Tally -----------------------------------------------
+
+Rows on numbered statements and numbered equations: 93.  FULL 63, PARTIAL 16, SPECIAL 4, NONE 10.
+Rows on statements of the running text: 25.  FULL 12, PARTIAL 11, SPECIAL 1, NONE 1.
+Modules cited in the rows: 79 of 120; declarations cited: 494.
+
+====================================================================================================
+PART 2. STATEMENTS OF THE RUNNING TEXT WITHOUT A LEAN STATEMENT
+====================================================================================================
+
+The statements of the running text that the library does not contain, beside those in the notes of
+Part 1:
+
+  - Section 2.2: the scheme of the class that holds a sample with feedthrough of a partner (the
+    local gain -W together with the own-output weight W).
+  - Section 2.3: the modified system of a scheme with l held samples as that of its underlying
+    one-step method, and the parasitic eigenvalues.
+  - Section 3.1: that Psi_0 is defined unless H A_i has an eigenvalue that is a nonzero multiple of
+    2 pi i.
+  - Section 3.2: the macro step at which a mode of the Jacobi hold loses its damping, H = -2
+    Re(1/lambda^); the frequency of the leapfrog method, sin(H w~/2) = H w/2; that a link within a
+    stage and a cycle with unequal numbers of links to a later and to an earlier stage have no
+    offsets.
+  - Section 4.2: the bound c_i >= (sum over the stores k at the distance l + 1 of
+    ([A^(l+1)]_ik)^2)^(1/2) for scalar stores; the exact rule with two held samples on the lossless
+    chain of three; the rule of fourth order from two held samples of an output and of its rate.
+  - Section 5.2: tau_k = (p_i - 2 p_k + p_j)/2 with offsets; that A_ik A_kj vanishes if the two
+    ports of the common partner act in orthogonal directions.
+  - Section 5.3: the star with three leaves (the least traces 3, 1.5 and 1) and the ring.
+  - Section 5.4: x^T A_seq x = 2 sum y_i^T L_ik y_k; the modified Hamiltonian of the symplectic
+    Euler method for two stores; the statement on coupling graphs with a cycle.
+  - Section 7.1: that a Jacobi scheme with the first-order input has X - U = O(H^3).
+  - Appendix A.3: skew Psi_0 = (1/12) H^2 skew(A_0^2) + O(H^4).
+
+====================================================================================================
+PART 3. MODULES NOT CITED BY THE PAPER
+====================================================================================================
+
+The library has 120 modules, all imported by CoSimFoundations.lean. The modules below are cited in
+no row of Part 1. Some hold lemmas on which cited theorems depend; the others formalise statements
+that the paper does not contain. Each line says what the module proves.
+
+------------------------------------ Imported by cited modules -------------------------------------
+
+These modules are imported, directly or through other modules, by modules that Part 1 cites, so that
+their lemmas can enter the proofs of cited theorems.
+
+  Accumulation           The identity (X - U) S_K = E_K + (I - X) sum_(k<K) E_k for the errors
+                         E_k = X^k - U^k of a run and S_K = sum_(k<K) U^k, and the bound of the
+                         one-step error by the errors over a run.
+  BarrierConstants       A lower bound on the error over a run from the one-step error of a one-step
+                         map: if ||X - U|| >= c and K H ||A|| <= 1/2, then the largest ||X^k -
+                         U^k||, k <= K, is at least min(K c/10, sqrt(c/6)).
+  BlockExp               The exponential of a padded diagonal block is the padded exponential of the
+                         block: the hypothesis "partner weights only" stated on the matrix of one
+                         subsystem.
+  Chain                  For a linear map T with alpha = ||T - I|| and least stretch m in dimension
+                         n: 1 - alpha <= m, m^n <= |det T| <= ||T||^n, ||T|| <= 1 + alpha.
+  DefectDifference       exp(H At) exp(-H A) - I as the integral over the macro step of
+                         exp(t At)(At - A) exp(-t A), and the bound of the one-step error by H ||At
+                         - A|| from it.
+  DetStretch             |det T| <= |T v| ||T||^(n-1) for every unit vector v; a map with ||T|| <= 1
+                         and |det T| >= 1 is an isometry; for a one-step map with |det D| = 1 that
+                         passes nothing between two orthonormal directions, n (||D|| - 1) >= |u| -
+                         alpha (eta + alpha/2).
+  DifferenceFloor        Lower bounds on ||At - A|| from a zero entry of the one-step map exp(H At).
+  ExpLog                 exp(log x) = x for ||x - 1|| < 1 in a real Banach algebra, for the
+                         logarithm series.
+  FirstOrderLead         A lower bound on the largest ||X^k - U^k|| over an interval of the length
+                         1/(2 ||A||) for a consistent scheme and two subsystems i, j that are not
+                         partners: ||[A_sig A]_ij|| H / (40 ||A||) minus an explicit remainder, for
+                         runs that start on the exact value. The paper states the bound over a run
+                         in the form of Theorem 4.5.
+  GaussSeidelTwo         Two scalar stores in sequential order: the one-step maps of the schemes
+                         with local gains are exactly the matrices with X_00 > 0 and det X > 0.
+  LogNorm                ||exp(t A)|| <= exp(c t) if <x, A x> <= c |x|^2 for all x, and the constant
+                         kappa in alpha <= kappa H ||Delta||.
+  MemoryBound            The inverse of a one-step map D U with ||D - I|| < 1 and its powers; for a
+                         Jacobi scheme with held samples, alpha >= f_i / (||U|| + rho) with an
+                         explicit rho that the coefficients of the past samples enter.
+  MemoryFloor            No map of rank at most r is closer to a map A than the least stretch of A
+                         on a subspace of dimension r + 1.
+  MemoryFloorSV          The singular value of A with the index k (counted from 0) is at most ||A -
+                         B|| for every B of rank at most k.
+  NegativeDamping        Jacobi scheme: X = F (I + Z) with tr Z = 0, H nu = -ln det(I + Z), and the
+                         total numerical damping to leading order from this form.
+  PairLaws               Inequalities for every one-step map and two orthonormal directions, without
+                         a zero entry: the symmetric transfer of D - I is at most (||D|| - 1) +
+                         alpha, and the gain of a diagonal entry.
+  PairTradeOff           For every one-step map and two orthonormal directions: |u_X| - alpha
+                         (eta + alpha/2) <= (||D||^2 - m^2)/2, with u_X what the scheme fails to
+                         pass between them; the energy error over a run against the energy error of
+                         one step.
+  Phi                    The functions phi_b(Z) = sum_j Z^j/(j + b)! in a Banach algebra and the
+                         integral of s^a exp((t - s) Z) over [0, t].
+  Region                 The one-step error alpha = ||T - I|| is at least the distance from 1 of the
+                         largest stretch and of the geometric mean of the other stretches; lower
+                         bounds of |det T| through the stretches.
+  SpectrumEnergyJacobi   One-step maps that pass nothing between two orthonormal directions: no gain
+                         of energy together with |det D| >= 1 forces a one-step error of first
+                         order; the energy error of a lossless system accumulates over a run; a
+                         product of two plane rotations on three stores.
+  TradeOff               For a one-step map with zero entries between two orthonormal directions:
+                         the one-step error against the gain of energy over a step.
+  TripleLaw              For every real matrix Delta and a bound lam of its quadratic form:
+                         |Delta_ij + Delta_ji| <= n lam - tr Delta, that is, nu + n iota >= 2
+                         |sym(Delta)_ij|.
+
+----------------------------------- Imported by no cited module ------------------------------------
+
+  BauerFike              The Bauer-Fike bound on the spectrum of a perturbed normal, unitary or
+                         diagonalisable operator.
+  BauerFikeMatrix        Bauer-Fike bounds on the eigenvalues of real matrices in the norm of an
+                         energy matrix.
+  ChainValue             The least trace of a positive semidefinite n x n matrix with prescribed
+                         entries two places off the diagonal and zeros beyond (a chain of n stores
+                         without injection).
+  Conservation           det X = product of det exp(H G_a) for a one-step map with a block
+                         triangular factorisation in the order of execution, and the trace of its
+                         modified system.
+  EnergyNormC            The complex inner product space of a real energy matrix Q, and the spectrum
+                         of a real matrix as that of its operator on it.
+  FrontBasis             Two stores with equal dissipation: exp(H (c I + nu J)) in closed form, and
+                         the one-step map and the difference of a scaled quarter turn.
+  FrontEqual             Two stores with equal dissipation, in row coordinates: every relative
+                         one-step map of the closure of the Jacobi schemes with positive determinant
+                         is dominated, in one-step error, in gain of energy and in mean damping, by
+                         a multiple s of the identity with s <= 1.
+  LinearODE              Variation of constants for x' = A x + f(t) with a bounded operator A on a
+                         real Banach space, with uniqueness of the solution.
+  MatrixODE              Variation of constants for matrices.
+  NoInjection            A one-step map with ||D|| <= 1 that passes nothing between two orthonormal
+                         directions: (det D)^2 <= 1 + alpha^2 - 2 (|u| - alpha eta), with u what the
+                         monolithic step passes between them.
+  NoInjectionJacobi      The statements of TradeOff and NoInjection for Jacobi schemes of scalar
+                         stores and two stores that are not partners; for every operator with
+                         ||D|| <= 1, (det D)^2 <= 1 - 2 |<D e_1, D e_2>|.
+  PairDamping            One macro step of a scheme that passes nothing between two orthonormal
+                         directions: the total damping against the gain of energy, in determinant
+                         form.
+  PairTrace              2 ||T_ij|| <= tr T_ii + tr T_jj + (n_i + n_j) iota <= tr T + n iota for a
+                         symmetric matrix T with -iota |x|^2 <= x^T T x and two subsystems i != j
+                         with n_i and n_j states.
+  Parity                 The sign rule (A^d)_ki = (-1)^d (A^d)_ik for stores d links apart in a
+                         network with A_ji = -A_ij, and its consequences for l held samples in a
+                         Jacobi scheme.
+  RegionTwo              Two states: det(x -> z x + w conj(x)) = |z|^2 - |w|^2, and the bounds of
+                         Region are attained.
+  RowCoords              Real 2 x 2 maps as x -> z x + w conj(x) on the complex numbers: the largest
+                         stretch |z| + |w| and the least stretch ||z| - |w||.
+  SpectralSplit          The splitting of a finite-dimensional real space into the invariant
+                         subspaces of a linear map that belong to its negative eigenvalues, to the
+                         eigenvalue 0 and to its other eigenvalues, with uniqueness.
+  Threshold              Two stores: exp(H A) in angle form, and the macro steps up to which a
+                         Jacobi scheme or a sequential scheme of two scalar stores can have exactly
+                         the monolithic step.
+  TwoStoreStep           exp(t B) = exp(c t)(cos(nu t) I + (sin(nu t)/nu) N) for B = c I + N with
+                         N^2 = -nu^2 I; the monolithic step of two stores.

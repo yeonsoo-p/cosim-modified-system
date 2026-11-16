@@ -1,0 +1,27 @@
+name = "CoSimFoundations"
+version = "1.0.0"
+defaultTargets = ["CoSimFoundations", "CoSimFoundationsAudit"]
+
+[leanOptions]
+pp.unicode.fun = true
+autoImplicit = false
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.35.0"
+
+# The library: imports Mathlib and nothing else.
+[[lean_lib]]
+name = "CoSimFoundations"
+[lean_lib.leanOptions]
+pp.unicode.fun = true
+autoImplicit = false
+relaxedAutoImplicit = false
+linter.unusedSectionVars = false
+warningAsError = true
+
+# The axiom audit: `#print axioms` for every listed theorem.
+[[lean_lib]]
+name = "CoSimFoundationsAudit"
+roots = ["CoSimFoundationsAudit"]
