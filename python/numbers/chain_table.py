@@ -138,6 +138,9 @@ show("gains, middle store first: unstable for h above", "0.2",
      first_above_one(lambda x: spectral_radius(with_gains((1, 0, 1), x)), 0.005, 2.5), digits=3)
 show("hold with partner weights only, middle store first: unstable for h above", "1.415",
      first_above_one(lambda x: spectral_radius(hold(A, S, (1, 0, 1), x)), 0.005, 2.5))
+# the same thresholds stand in the example "supplying the reaction on the chain of three", with one more:
+show("gains, from end to end: unstable for h above", "1.48",
+     first_above_one(lambda x: spectral_radius(with_gains((0, 1, 2), x)), 0.005, 2.5), digits=2)
 show("gains, Jacobi and middle store first: the scheme injects, in units of alpha_*", "1.0",
      (gres["Jacobi"][0]["s_plus"] - 1) / a_star)
 show("gains, Jacobi: a decay rate is shifted by, in units of H w^2", "0.5", gres["Jacobi"][2])

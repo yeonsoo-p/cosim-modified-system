@@ -1328,14 +1328,20 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
                 own output). The coefficients of the partner samples are those of any consistent
                 scheme. The bound on the norm of the block is explicit.
 
-[112] Example 6.2 (one oscillator, four choices of port)                                        NONE
+[112] Example 6.2 (supplying the reaction on the chain of three)                                NONE
+     label    : ex:gains
+     note     : Stability thresholds of the zero-order hold with and without the gains of the
+                reaction on the chain of three stores, in three orders of execution; computed, not
+                proved.
+
+[113] Example 6.3 (one oscillator, four choices of port)                                        NONE
      label    : ex:ports
      note     : Numbers and qualitative statements on four partitions of one oscillator; computed,
                 not proved.
 
 ---------------------------------------- Appendix A: Proofs ----------------------------------------
 
-[113] (39)                                                                                      FULL
+[114] (39)                                                                                      FULL
      label    : eq:etam
      statement: ||eta_m (H A)^m on V^[m]|| <= ||T_i|| + (kappa' ||A|| + kappa'' w) ||A||^(m+1)
                 H^(m+2) for 0 <= m <= l.
@@ -1345,7 +1351,7 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
      note     : In the form |H^m nu_m A^m v - H^(m+1)/(m+1)! Pi_i A^(m+1) v| <= (||T_i|| + e_m) |v|
                 for v in V^[m], with e_m bounded for H ||A|| <= 1 by memE_le and nodeE_le.
 
-[114] (40)                                                                                      FULL
+[115] (40)                                                                                      FULL
      label    : eq:multistep
      statement: The rule of subsystem i has the form (Pi_i - N_i) x^(k+1) = sum over q < l of M_i,q
                 x^(k-q), and its local defect is T_i = (Pi_i - N_i) U - sum_q M_i,q U^(-q).
@@ -1356,7 +1362,7 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
                 rowDefect_rule prove that the rule (6) of one subsystem has this form, with this
                 defect, for every l and for old and new samples mixed.
 
-[115] Lemma A.1 (order over a run), (41)                                                        FULL
+[116] Lemma A.1 (order over a run), (41)                                                        FULL
      label    : thm:runorder, eq:runorder
      statement: If the sequences x^k satisfy (40) for one subsystem i, with arbitrary starting
                 values and arbitrary rules of the other subsystems, K >= l, K H ||A|| <= 1/2,
@@ -1373,7 +1379,7 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
                 initial states need not be linear; a complete normed space; no stability is assumed.
                 run_order_fraction is the same bound for the whole recursion in place of one row.
 
-[116] (42)                                                                                      FULL
+[117] (42)                                                                                      FULL
      label    : eq:coefbound
      statement: Where the maps are independent, ||G_ij^q C_j|| <= kappa_3 (H + ||T_i|| H^(1-l)).
      Lean     : BoundedCoefficients.lean: norm_coeff_comp_le, norm_coeff_comp_le_scheme,
@@ -1384,7 +1390,7 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
                 kappa_3 = coefConst, which depends on ||R|| and on the norms of the coupling and
                 output maps.
 
-[117] Appendix A.3, proof: the determinant                                                   SPECIAL
+[118] Appendix A.3, proof: the determinant                                                   SPECIAL
      label    : (text)
      statement: Ordered by stage, I - G^new C is block unit lower triangular and F + G^old C block
                 upper triangular with the diagonal blocks F_i; with partner weights det
@@ -1395,7 +1401,7 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
      note     : det(I - G^new C) = 1 for every assignment of stages; det X = det F for distinct
                 stages (the special case of the row on the determinant in Proposition 5.1).
 
-[118] Appendix A.4, proof of Proposition 5.5                                                    FULL
+[119] Appendix A.4, proof of Proposition 5.5                                                    FULL
      label    : (text)
      statement: Store k advances on its own state, on the new value of store k - 1 and on the old
                 value of store k + 1; the coefficients F_k are positive.
@@ -1404,13 +1410,14 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
 
 ----------------------------------- Examples, tables and figures -----------------------------------
 
-Example 2.3, Example 4.3, Example 5.6, Example 6.2, the numbers of the two tables of Section 7 and
-the numbers in the captions of the figures are computed, not proved; the code that computes them is
-published with the library. Equation (4), the running example, fixes notation and has no row.
+Example 2.3, Example 4.3, Example 5.6, Example 6.2, Example 6.3, the numbers of the two tables of
+Section 7 and the numbers in the captions of the figures are computed, not proved; the code that
+computes them is published with the library. Equation (4), the running example, fixes notation and
+has no row.
 
 ---------------------------------------------- Tally -----------------------------------------------
 
-Rows on numbered statements and numbered equations: 93.  FULL 63, PARTIAL 16, SPECIAL 4, NONE 10.
+Rows on numbered statements and numbered equations: 94.  FULL 63, PARTIAL 16, SPECIAL 4, NONE 11.
 Rows on statements of the running text: 25.  FULL 12, PARTIAL 11, SPECIAL 1, NONE 1.
 Modules cited in the rows: 79 of 120; declarations cited: 494.
 

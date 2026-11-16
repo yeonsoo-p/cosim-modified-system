@@ -96,7 +96,7 @@ only.
     the size O(H^3 |x^k|^2) of the term with skew Psi_0, its vanishing when some A_i are symmetric
     and others skew, and that the second term of (37) is absent only if no two partners share a
     stage.
-  - Section 6. In Proposition 6.1: the two inequalities that follow (38). Example 6.2.
+  - Section 6. In Proposition 6.1: the two inequalities that follow (38). Example 6.2, Example 6.3.
 
 Statements of the running text have a row in CORRESPONDENCE.txt where the library has a declaration
 for them. Of the running text, the following are outside the formalisation.
@@ -132,5 +132,6 @@ for them. Of the running text, the following are outside the formalisation.
   - Section 7.1: that a Jacobi scheme with the first-order input has X - U = O(H^3).
   - Appendix A.3: skew Psi_0 = (1/12) H^2 skew(A_0^2) + O(H^4).
 
-Example 2.3, Example 4.3, Example 5.6, Example 6.2, the numbers of the two tables and the numbers of
-the figures are computed, not proved; the code that computes them is published with the library.
+Example 2.3, Example 4.3, Example 5.6, Example 6.2, Example 6.3, the numbers of the two tables and
+the numbers of the figures are computed, not proved; the code that computes them is published with
+the library.

@@ -100,8 +100,9 @@ optimal_schemes.py      chain of three at h = 0.1: the scheme with local gains t
                         0.3, 0.5                                                         bound); circles of the figure of the bound
 chain_table.py          chain of three at h = 0.1: one-step error, injected energy,      table "Schemes on the chain of three stores"
                         shifts of the two decay rates and error over the run for the     (every entry); section "Common schemes on
-                        zero-order holds, the holds with the gains K_i, linear           the chain of three" (running text); example
-                        extrapolation and the derivative of the partner output;          "the chain of three stores" (alpha_* =
+                        zero-order holds, the holds with the gains K_i, linear           the chain of three" (running text); examples
+                        extrapolation and the derivative of the partner output;          "supplying the reaction on the chain of three"
+                                                                                         and "the chain of three stores" (alpha_* =
                         stability limits with the gains; a Jacobi scheme with the        0.0050, 2.0 to 2.2); end of the section
                         spectrum of the monolithic system                                "Convergence over a run"; section "Where the
                                                                                          reaction can be taken from" (X - U = O(H^3))
