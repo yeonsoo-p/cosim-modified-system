@@ -1419,7 +1419,7 @@ has no row.
 
 Rows on numbered statements and numbered equations: 94.  FULL 63, PARTIAL 16, SPECIAL 4, NONE 11.
 Rows on statements of the running text: 25.  FULL 12, PARTIAL 11, SPECIAL 1, NONE 1.
-Modules cited in the rows: 79 of 120; declarations cited: 494.
+Modules cited in the rows: 79 of 101; declarations cited: 494.
 
 ====================================================================================================
 PART 2. STATEMENTS OF THE RUNNING TEXT WITHOUT A LEAN STATEMENT
@@ -1453,14 +1453,9 @@ Part 1:
 PART 3. MODULES NOT CITED BY THE PAPER
 ====================================================================================================
 
-The library has 120 modules, all imported by CoSimFoundations.lean. The modules below are cited in
-no row of Part 1. Some hold lemmas on which cited theorems depend; the others formalise statements
-that the paper does not contain. Each line says what the module proves.
-
------------------------------------- Imported by cited modules -------------------------------------
-
-These modules are imported, directly or through other modules, by modules that Part 1 cites, so that
-their lemmas can enter the proofs of cited theorems.
+The library has 101 modules, all imported by CoSimFoundations.lean. The 22 modules below are cited
+in no row of Part 1. Modules that Part 1 cites import them, directly or through other modules, so
+that their lemmas can enter the proofs of cited theorems. Each line says what the module proves.
 
   Accumulation           The identity (X - U) S_K = E_K + (I - X) sum_(k<K) E_k for the errors
                          E_k = X^k - U^k of a run and S_K = sum_(k<K) U^k, and the bound of the
@@ -1522,54 +1517,3 @@ their lemmas can enter the proofs of cited theorems.
   TripleLaw              For every real matrix Delta and a bound lam of its quadratic form:
                          |Delta_ij + Delta_ji| <= n lam - tr Delta, that is, nu + n iota >= 2
                          |sym(Delta)_ij|.
-
------------------------------------ Imported by no cited module ------------------------------------
-
-  BauerFike              The Bauer-Fike bound on the spectrum of a perturbed normal, unitary or
-                         diagonalisable operator.
-  BauerFikeMatrix        Bauer-Fike bounds on the eigenvalues of real matrices in the norm of an
-                         energy matrix.
-  ChainValue             The least trace of a positive semidefinite n x n matrix with prescribed
-                         entries two places off the diagonal and zeros beyond (a chain of n stores
-                         without injection).
-  Conservation           det X = product of det exp(H G_a) for a one-step map with a block
-                         triangular factorisation in the order of execution, and the trace of its
-                         modified system.
-  EnergyNormC            The complex inner product space of a real energy matrix Q, and the spectrum
-                         of a real matrix as that of its operator on it.
-  FrontBasis             Two stores with equal dissipation: exp(H (c I + nu J)) in closed form, and
-                         the one-step map and the difference of a scaled quarter turn.
-  FrontEqual             Two stores with equal dissipation, in row coordinates: every relative
-                         one-step map of the closure of the Jacobi schemes with positive determinant
-                         is dominated, in one-step error, in gain of energy and in mean damping, by
-                         a multiple s of the identity with s <= 1.
-  LinearODE              Variation of constants for x' = A x + f(t) with a bounded operator A on a
-                         real Banach space, with uniqueness of the solution.
-  MatrixODE              Variation of constants for matrices.
-  NoInjection            A one-step map with ||D|| <= 1 that passes nothing between two orthonormal
-                         directions: (det D)^2 <= 1 + alpha^2 - 2 (|u| - alpha eta), with u what the
-                         monolithic step passes between them.
-  NoInjectionJacobi      The statements of TradeOff and NoInjection for Jacobi schemes of scalar
-                         stores and two stores that are not partners; for every operator with
-                         ||D|| <= 1, (det D)^2 <= 1 - 2 |<D e_1, D e_2>|.
-  PairDamping            One macro step of a scheme that passes nothing between two orthonormal
-                         directions: the total damping against the gain of energy, in determinant
-                         form.
-  PairTrace              2 ||T_ij|| <= tr T_ii + tr T_jj + (n_i + n_j) iota <= tr T + n iota for a
-                         symmetric matrix T with -iota |x|^2 <= x^T T x and two subsystems i != j
-                         with n_i and n_j states.
-  Parity                 The sign rule (A^d)_ki = (-1)^d (A^d)_ik for stores d links apart in a
-                         network with A_ji = -A_ij, and its consequences for l held samples in a
-                         Jacobi scheme.
-  RegionTwo              Two states: det(x -> z x + w conj(x)) = |z|^2 - |w|^2, and the bounds of
-                         Region are attained.
-  RowCoords              Real 2 x 2 maps as x -> z x + w conj(x) on the complex numbers: the largest
-                         stretch |z| + |w| and the least stretch ||z| - |w||.
-  SpectralSplit          The splitting of a finite-dimensional real space into the invariant
-                         subspaces of a linear map that belong to its negative eigenvalues, to the
-                         eigenvalue 0 and to its other eigenvalues, with uniqueness.
-  Threshold              Two stores: exp(H A) in angle form, and the macro steps up to which a
-                         Jacobi scheme or a sequential scheme of two scalar stores can have exactly
-                         the monolithic step.
-  TwoStoreStep           exp(t B) = exp(c t)(cos(nu t) I + (sin(nu t)/nu) N) for B = c I + N with
-                         N^2 = -nu^2 I; the monolithic step of two stores.

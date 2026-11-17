@@ -2,38 +2,25 @@
 CoSimFoundations: a Lean 4 library for the theory of non-iterative co-simulation.
 Only Mathlib is imported.
 -/
-import CoSimFoundations.LinearODE
 import CoSimFoundations.DetExp
 import CoSimFoundations.Setting
-import CoSimFoundations.MatrixODE
-import CoSimFoundations.SpectralSplit
 import CoSimFoundations.Phi
 import CoSimFoundations.ExpLog
 import CoSimFoundations.EnergyNorm
-import CoSimFoundations.BauerFike
-import CoSimFoundations.EnergyNormC
-import CoSimFoundations.BauerFikeMatrix
 import CoSimFoundations.EnergyExtremal
 import CoSimFoundations.Chain
 import CoSimFoundations.Floor
 import CoSimFoundations.Region
-import CoSimFoundations.Conservation
-import CoSimFoundations.RowCoords
-import CoSimFoundations.RegionTwo
 import CoSimFoundations.ScalarStores
 import CoSimFoundations.GaussSeidel
 import CoSimFoundations.FloorMatrix
 import CoSimFoundations.GaussSeidelTwo
-import CoSimFoundations.TwoStoreStep
 import CoSimFoundations.MemoryFloor
 import CoSimFoundations.DefectDifference
-import CoSimFoundations.FrontBasis
 import CoSimFoundations.DifferenceFloor
 import CoSimFoundations.LogNorm
-import CoSimFoundations.Threshold
 import CoSimFoundations.OrderBarrier
 import CoSimFoundations.TradeOff
-import CoSimFoundations.FrontEqual
 import CoSimFoundations.MemoryFloorSV
 import CoSimFoundations.RealLog
 import CoSimFoundations.VisibilityFloor
@@ -42,11 +29,8 @@ import CoSimFoundations.TripleLaw
 import CoSimFoundations.DetStretch
 import CoSimFoundations.PairTradeOff
 import CoSimFoundations.RankFloor
-import CoSimFoundations.NoInjection
 import CoSimFoundations.PairLaws
-import CoSimFoundations.NoInjectionJacobi
 import CoSimFoundations.SpectrumEnergyJacobi
-import CoSimFoundations.PairDamping
 import CoSimFoundations.TripleLawGeneral
 import CoSimFoundations.MemoryBound
 import CoSimFoundations.BarrierConstants
@@ -60,14 +44,12 @@ import CoSimFoundations.NegativeDamping
 import CoSimFoundations.AdamsConstants
 import CoSimFoundations.RunOrder
 import CoSimFoundations.MemoryLead
-import CoSimFoundations.Parity
 import CoSimFoundations.BlockExp
 import CoSimFoundations.Reaction
 import CoSimFoundations.ReactionDiag
 import CoSimFoundations.ReactionGain
 import CoSimFoundations.OneSided
 import CoSimFoundations.ReactionSV
-import CoSimFoundations.ChainValue
 import CoSimFoundations.DampedChain
 import CoSimFoundations.SimilarOrders
 import CoSimFoundations.SimilarOrdersScheme
@@ -112,7 +94,6 @@ import CoSimFoundations.RunOrderRow
 import CoSimFoundations.RunOrderRowLead
 import CoSimFoundations.Offsets
 import CoSimFoundations.OffsetsConjugacy
-import CoSimFoundations.PairTrace
 import CoSimFoundations.SignedCouplingParts
 import CoSimFoundations.LeadingValueOne
 import CoSimFoundations.BoundedCoefficients

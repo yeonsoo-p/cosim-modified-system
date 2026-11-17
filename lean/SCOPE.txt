@@ -6,22 +6,22 @@ SCOPE of the formalisation: the standard, the form of the statements, and what i
 
 The library CoSimFoundations is written in Lean 4, toolchain leanprover/lean4:v4.35.0
 (file lean-toolchain), with Mathlib at the tag v4.35.0, commit
-56a005855ea17e0b0958f73ec801ae140b0a1679 (file lake-manifest.json). It has 120 modules in the folder
-CoSimFoundations, with 1,784 theorems and 250 definitions and structures in 35,394 lines; the root
+56a005855ea17e0b0958f73ec801ae140b0a1679 (file lake-manifest.json). It has 101 modules in the folder
+CoSimFoundations, with 1,566 theorems and 214 definitions and structures in 31,969 lines; the root
 file CoSimFoundations.lean imports all of them. The library imports Mathlib and nothing else: every
-import line of the 120 modules, of the root file and of the audit file names a module of Mathlib or
-of the library itself. It contains no unproved step and declares no axiom: a search of these 122
+import line of the 101 modules, of the root file and of the audit file names a module of Mathlib or
+of the library itself. It contains no unproved step and declares no axiom: a search of these 103
 files for the words sorry, admit, native_decide, axiom, unsafe, opaque, implemented_by, extern and
 set_option, as whole words in code and comments, finds none of them. The library is compiled with
 autoImplicit switched off and with warnings treated as errors (lakefile.toml), so that a declaration
 that uses sorry would stop the build.
 
-The audit. CoSimFoundationsAudit.lean imports the library and consists of 1,622 lines of the form
+The audit. CoSimFoundationsAudit.lean imports the library and consists of 1,491 lines of the form
 "#print axioms CoSimFoundations.name", one for each audited theorem by its fully qualified name.
 When the file is built, Lean prints for each of them the axioms on which its proof depends, through
 all lemmas that it uses. The standard is met if the build ends without an error and every printed
 list contains only propext, Classical.choice and Quot.sound, the three standard axioms of Lean. The
-162 theorems that the audit does not list are lemmas, nine of them private; the text search above
+75 theorems that the audit does not list are lemmas, nine of them private; the text search above
 covers them as well, and CORRESPONDENCE.txt marks with "(+)" those that it cites.
 
 To build, in this folder: "lake exe cache get" downloads the compiled Mathlib, and "lake build" then
