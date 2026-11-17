@@ -57,17 +57,8 @@ theorem fraction_of_le {t δ s b β η b' K' : ℝ} (hδ : 0 ≤ δ) (hK' : 0 < 
     (hb : 0 ≤ b) (hβ0 : 0 ≤ β) (hs : s ≤ 1 / (0.35 * K')) (hβ : β ≤ t + η)
     (hbb : b + K' * η ≤ b') (h : t ≤ δ * s * (b + K' * β)) :
     0.35 * (K' * t) / (b' + K' * t) ≤ δ := by
-  have h1 : b + K' * β ≤ b' + K' * t := by
-    have := mul_le_mul_of_nonneg_left hβ hK'.le
-    linarith
-  have h0 : 0 ≤ b + K' * β := add_nonneg hb (mul_nonneg hK'.le hβ0)
-  have h2 : t ≤ δ * (1 / (0.35 * K')) * (b' + K' * t) :=
-    h.trans (mul_le_mul (mul_le_mul_of_nonneg_left hs hδ) h1 h0
-      (mul_nonneg hδ (by positivity)))
-  have h3 : 0.35 * (K' * t) ≤ δ * (b' + K' * t) := by
-    rw [mul_one_div, div_mul_eq_mul_div, le_div_iff₀ (by positivity)] at h2
-    linarith
-  rcases (h0.trans h1).eq_or_lt with h4 | h4
+  obtain ⟨h0, h3⟩ := run_bound_of_le hδ hK' hb hβ0 hs hβ hbb h
+  rcases h0.eq_or_lt with h4 | h4
   · rw [← h4, div_zero]
     exact hδ
   · rw [div_le_iff₀ h4]
@@ -77,14 +68,7 @@ end Real
 
 section Algebra
 
-variable {𝔸 : Type*} [NormedRing 𝔸] [NormedAlgebra ℝ 𝔸] [CompleteSpace 𝔸]
-
-/-- The reference step has the inverse `exp (-(H • A))`. -/
-private theorem exp_neg_mul_exp_self (Z : 𝔸) : exp (-Z) * exp Z = 1 := by
-  let _ : NormedAlgebra ℚ 𝔸 := NormedAlgebra.restrictScalars ℚ ℝ 𝔸
-  rw [← exp_add_of_commute (Commute.refl Z).neg_left, neg_add_cancel, exp_zero]
-
-variable [NormOneClass 𝔸]
+variable {𝔸 : Type*} [NormedRing 𝔸] [NormedAlgebra ℝ 𝔸] [CompleteSpace 𝔸] [NormOneClass 𝔸]
 
 /-- The constant of the paper: with `‖N‖ ≤ n̄`, `‖M r‖ ≤ m̄` for `1 ≤ r < l`, `1 ≤ l ≤ K` and
 `K H ‖A‖ ≤ 1/2`, `b₀ + K' η ≤ 2.65 (1 + n̄) + 1.42 m̄ l (l - 1)`, where
@@ -98,23 +82,16 @@ theorem run_fraction_constant_le (A N : 𝔸) (M : ℕ → 𝔸) {H : ℝ} (hH :
           ∑ r ∈ range l, ‖M r‖ * ‖exp (-(H • A)) ^ r - 1‖) ≤
       2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) := by
   refine (run_constant_le A N M hH hl hK hKH hN hM).trans ?_
-  have hl1 : (1 : ℝ) ≤ l := by exact_mod_cast hl
   have hlK : (l : ℝ) ≤ K := by exact_mod_cast hK
   have hx : 0 ≤ H * ‖A‖ := mul_nonneg hH (norm_nonneg A)
   have hKx : (K : ℝ) * (H * ‖A‖) ≤ 1 / 2 := by rw [← mul_assoc]; exact hKH
   have he : Real.exp (((l : ℝ) - 1) * (H * ‖A‖)) ≤ Real.exp (1 / 2) :=
     Real.exp_le_exp.2 ((mul_le_mul_of_nonneg_right (by linarith) hx).trans hKx)
-  have hm : 0 ≤ mbar * ((l : ℝ) * (l - 1)) := by
-    rcases hl.eq_or_lt with h1 | h1
-    · subst h1
-      simp
-    · exact mul_nonneg ((norm_nonneg _).trans (hM 1 le_rfl h1))
-        (mul_nonneg (by linarith) (by linarith))
   have h2 := exp_half_lt
   have h3 : mbar * ((l : ℝ) * (l - 1)) *
       (1 + 1 / 4 * Real.exp (((l : ℝ) - 1) * (H * ‖A‖))) ≤
       mbar * ((l : ℝ) * (l - 1)) * 1.42 :=
-    mul_le_mul_of_nonneg_left (by linarith) hm
+    mul_le_mul_of_nonneg_left (by linarith) (bound_mul_pred_nonneg hl hM)
   linarith
 
 /-- The bound `eq:runorder` from a bound on the local defect: the common last step of the
@@ -129,19 +106,11 @@ theorem run_fraction_of_defect_le (A N : 𝔸) (M : ℕ → 𝔸) {H : ℝ} (hH 
     0.35 * (((K : ℝ) - l + 1) * ‖runDefect N M (exp (H • A)) (exp (-(H • A))) l‖) /
       (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) +
         ((K : ℝ) - l + 1) * ‖runDefect N M (exp (H • A)) (exp (-(H • A))) l‖) ≤ δ := by
-  have hlK : (l : ℝ) ≤ K := by exact_mod_cast hK
-  have hK' : (0 : ℝ) < (K : ℝ) - l + 1 := by linarith
-  have he := exp_half_lt
-  have hconst := run_fraction_constant_le A N M hH hl hK hKH hN hM
-  have hb : 0 ≤ 2 * ‖1 - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ :=
-    add_nonneg (by positivity)
-      (mul_nonneg (by norm_num) (sum_nonneg fun r _ => by positivity))
-  have hs : ‖S'‖ ≤ 1 / (0.35 * ((K : ℝ) - l + 1)) := by
-    refine hS'.trans (one_div_le_one_div_of_le (by positivity) ?_)
-    exact mul_le_mul_of_nonneg_right (by linarith) hK'.le
-  have hβ := norm_runBalance_le N M (exp (H • A)) (exp (-(H • A))) l
-  rw [add_assoc] at hβ
-  exact fraction_of_le hδ hK' hb (norm_nonneg _) hs hβ hconst h
+  have hK' := run_length_pos hK
+  have hb : 0 ≤ 2 * ‖1 - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ := by positivity
+  exact fraction_of_le hδ hK' hb (norm_nonneg _) (le_one_div_of_le_one_div_exp_half hK' hS')
+    ((norm_runBalance_le N M (exp (H • A)) (exp (-(H • A))) l).trans_eq (add_assoc _ _ _))
+    (run_fraction_constant_le A N M hH hl hK hKH hN hM) h
 
 /-- **Theorem "order over a run", inequality `eq:runorder`, for a linear starting procedure**,
 in a Banach algebra with `‖1‖ = 1`: let `X k` be the map from the initial state to the state
@@ -159,73 +128,16 @@ theorem run_order_fraction_linear (A N : 𝔸) (M : ℕ → 𝔸) {H : ℝ} (hH 
         ‖(1 - N) * exp (H • A) - ∑ r ∈ range l, M r * exp (-(H • A)) ^ r‖) /
       (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) + ((K : ℝ) - l + 1) *
         ‖(1 - N) * exp (H • A) - ∑ r ∈ range l, M r * exp (-(H • A)) ^ r‖) ≤ δ := by
-  have hδ0 : 0 ≤ δ := (norm_nonneg _).trans (hδ 0 (Nat.zero_le _))
   obtain ⟨S', hS, hS'⟩ := exists_sum_Ico_pow_right_inverse A hH hl hK hKH
-  refine run_fraction_of_defect_le A N M hH hl hK hKH hN hM hδ0 hS' ?_
-  have hx : ∀ k, l - 1 ≤ k → k < K →
-      (1 - N) • (X (k + 1) * S') = ∑ r ∈ range l, M r • (X (k - r) * S') := by
-    intro k hk hkK
-    simp only [smul_eq_mul, ← mul_assoc]
-    rw [hX k hk hkK, sum_mul]
-  have hd : ∀ k ≤ K, ‖X k * S' - exp (H • A) ^ k • S' • (1 : 𝔸)‖ ≤ δ * ‖S'‖ := by
-    intro k hk
-    rw [smul_eq_mul, smul_eq_mul, mul_one, ← sub_mul]
-    exact (norm_mul_le _ _).trans (mul_le_mul_of_nonneg_right (hδ k hk) (norm_nonneg _))
-  have h := norm_runDefect_smul_le_of_run (exp_neg_mul_exp_self (H • A)) hl hK hS (1 : 𝔸)
-    (fun k => X k * S') hx hd
-  rwa [smul_eq_mul, mul_one] at h
+  exact run_fraction_of_defect_le A N M hH hl hK hKH hN hM
+    ((norm_nonneg _).trans (hδ 0 (Nat.zero_le _))) hS'
+    (norm_runDefect_le_of_linear_runs A N M hl hK X hX hδ hS)
 
 end Algebra
 
 section Operator
 
 variable {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpace E] [Nontrivial E]
-
-/-- The local defect is bounded by the errors of the runs: if `S'` is a right inverse of
-`Σ_{k=l-1}^{K-1} U^k` and `δ ≥ 0` bounds the relative error of the runs of all initial states
-`x_0 ≠ 0` for `k ≤ K`, then `‖T‖ ≤ δ ‖S'‖ (2 ‖1 - N‖ + 2 Σ_r r ‖M r‖ + (K - l + 1) ‖B‖)`. -/
-theorem norm_runDefect_le_of_runs (A N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] E) {H : ℝ}
-    {l K : ℕ} (hl : 1 ≤ l) (hK : l ≤ K) (x : E → ℕ → E)
-    (hx : ∀ x0, x0 ≠ 0 → ∀ k, l - 1 ≤ k → k < K →
-      (1 - N) (x x0 (k + 1)) = ∑ r ∈ range l, M r (x x0 (k - r)))
-    {δ : ℝ} (hδ0 : 0 ≤ δ)
-    (hδ : ∀ x0, x0 ≠ 0 → ∀ k ≤ K, ‖x x0 k - (exp (H • A) ^ k) x0‖ ≤ δ * ‖x0‖)
-    {S' : E →L[ℝ] E} (hS : (∑ k ∈ Ico (l - 1) K, exp (H • A) ^ k) * S' = 1) :
-    ‖runDefect N M (exp (H • A)) (exp (-(H • A))) l‖ ≤
-      δ * ‖S'‖ * (2 * ‖1 - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ +
-        ((K : ℝ) - l + 1) * ‖runBalance N M l‖) := by
-  have hbdd : IsBoundedSMul (E →L[ℝ] E) E :=
-    IsBoundedSMul.of_norm_smul_le fun T v => T.le_opNorm v
-  have hb : 0 ≤ 2 * ‖1 - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ +
-      ((K : ℝ) - l + 1) * ‖runBalance N M l‖ := by
-    have hlK : (l : ℝ) ≤ K := by exact_mod_cast hK
-    have h1 : (0 : ℝ) ≤ ∑ r ∈ range l, (r : ℝ) * ‖M r‖ := sum_nonneg fun r _ => by positivity
-    have h2 : 0 ≤ ((K : ℝ) - l + 1) * ‖runBalance N M l‖ :=
-      mul_nonneg (by linarith) (norm_nonneg _)
-    have := norm_nonneg (1 - N)
-    linarith
-  refine ContinuousLinearMap.opNorm_le_bound _
-    (mul_nonneg (mul_nonneg hδ0 (norm_nonneg _)) hb) fun v => ?_
-  rcases eq_or_ne v 0 with rfl | hv
-  · simp
-  have hx0 : S' v ≠ 0 := by
-    intro h0
-    have h1 : (∑ k ∈ Ico (l - 1) K, exp (H • A) ^ k) (S' v) = v := by
-      rw [← mul_apply_eq_comp, hS, one_apply_eq_self]
-    rw [h0, map_zero] at h1
-    exact hv h1.symm
-  have h := norm_runDefect_smul_le_of_run (V := E) (exp_neg_mul_exp_self (H • A)) hl hK hS v
-    (x (S' v)) (hx (S' v) hx0) (hδ (S' v) hx0)
-  refine h.trans ?_
-  have h3 : δ * ‖S' v‖ ≤ δ * ‖S'‖ * ‖v‖ := by
-    rw [mul_assoc]
-    exact mul_le_mul_of_nonneg_left (S'.le_opNorm v) hδ0
-  calc δ * ‖S' v‖ * (2 * ‖1 - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ +
-        ((K : ℝ) - l + 1) * ‖runBalance N M l‖)
-      ≤ δ * ‖S'‖ * ‖v‖ * (2 * ‖1 - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ +
-        ((K : ℝ) - l + 1) * ‖runBalance N M l‖) := mul_le_mul_of_nonneg_right h3 hb
-    _ = δ * ‖S'‖ * (2 * ‖1 - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ +
-        ((K : ℝ) - l + 1) * ‖runBalance N M l‖) * ‖v‖ := by ring
 
 /-- **Theorem "order over a run", inequality `eq:runorder`** (the paper, `thm:runorder`). Operators
 on a real Banach space `E ≠ 0`. A starting procedure assigns to every initial state `x_0 ≠ 0` a
@@ -247,10 +159,7 @@ theorem run_order_fraction (A N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] E) {H 
         ‖(1 - N) * exp (H • A) - ∑ r ∈ range l, M r * exp (-(H • A)) ^ r‖) /
       (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) + ((K : ℝ) - l + 1) *
         ‖(1 - N) * exp (H • A) - ∑ r ∈ range l, M r * exp (-(H • A)) ^ r‖) ≤ δ := by
-  have hδ0 : 0 ≤ δ := by
-    obtain ⟨y, hy⟩ := exists_ne (0 : E)
-    have h := (norm_nonneg _).trans (hδ y hy 0 (Nat.zero_le _))
-    exact nonneg_of_mul_nonneg_left h (norm_pos_iff.2 hy)
+  have hδ0 := relative_error_bound_nonneg hδ
   obtain ⟨S', hS, hS'⟩ := exists_sum_Ico_pow_right_inverse A hH hl hK hKH
   exact run_fraction_of_defect_le A N M hH hl hK hKH hN hM hδ0 hS'
     (norm_runDefect_le_of_runs A N M hl hK x hx hδ0 hδ hS)
@@ -269,10 +178,8 @@ theorem run_order_fraction_isLUB (A N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] 
     0.35 * (((K : ℝ) - l + 1) *
         ‖(1 - N) * exp (H • A) - ∑ r ∈ range l, M r * exp (-(H • A)) ^ r‖) /
       (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) + ((K : ℝ) - l + 1) *
-        ‖(1 - N) * exp (H • A) - ∑ r ∈ range l, M r * exp (-(H • A)) ^ r‖) ≤ ε := by
-  refine run_order_fraction A N M hH hl hK hKH hN hM x hx fun x0 hx0 k hk => ?_
-  have h := hε.1 ⟨x0, hx0, k, hk, rfl⟩
-  rwa [div_le_iff₀ (norm_pos_iff.2 hx0)] at h
+        ‖(1 - N) * exp (H • A) - ∑ r ∈ range l, M r * exp (-(H • A)) ^ r‖) ≤ ε :=
+  run_order_fraction A N M hH hl hK hKH hN hM x hx (relative_error_le_of_isLUB hε)
 
 /-- **Theorem "order over a run", inequality `eq:runorder`, as a statement about single runs:**
 for every `c` below `0.35 T_K / (b + T_K)` there are an initial state `x_0 ≠ 0` and a step
@@ -286,13 +193,9 @@ theorem exists_run_order_fraction (A N : E →L[ℝ] E) (M : ℕ → E →L[ℝ]
         ‖(1 - N) * exp (H • A) - ∑ r ∈ range l, M r * exp (-(H • A)) ^ r‖) /
       (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) + ((K : ℝ) - l + 1) *
         ‖(1 - N) * exp (H • A) - ∑ r ∈ range l, M r * exp (-(H • A)) ^ r‖)) :
-    ∃ x0, x0 ≠ 0 ∧ ∃ k ≤ K, c * ‖x0‖ < ‖x x0 k - (exp (H • A) ^ k) x0‖ := by
-  by_contra hne
-  have hδ : ∀ x0, x0 ≠ 0 → ∀ k ≤ K, ‖x x0 k - (exp (H • A) ^ k) x0‖ ≤ c * ‖x0‖ := by
-    intro x0 hx0 k hk
-    by_contra hlt
-    exact hne ⟨x0, hx0, k, hk, not_le.1 hlt⟩
-  exact absurd (run_order_fraction A N M hH hl hK hKH hN hM x hx hδ) (not_le.2 hc)
+    ∃ x0, x0 ≠ 0 ∧ ∃ k ≤ K, c * ‖x0‖ < ‖x x0 k - (exp (H • A) ^ k) x0‖ :=
+  exists_relative_error_gt
+    (fun _ hδ => run_order_fraction A N M hH hl hK hKH hN hM x hx hδ) hc
 
 end Operator
 

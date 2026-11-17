@@ -12,13 +12,13 @@ The standard of the formalisation and the list of what is outside it are in SCOP
 
 Lean names are relative to the namespace CoSimFoundations and are followed by nothing if they are
 theorems of the audit list CoSimFoundationsAudit.lean, by "(def)" if they are definitions or
-structures (the audit lists theorems only), and by "(+)" if they are theorems that the audit does
-not list. Each name is preceded by the file of its module in the folder CoSimFoundations. Formulas
-are written in plain text: A_0 = diag(A_i) and A_c are the block-diagonal and the coupling part of
-A, A_sig the signed coupling with the blocks sig_ik A_ik, sig_ik = +1 if k runs at an earlier stage
-than i and -1 otherwise, sigma_ik = (sig_ik + 1)/2, U = exp(H A), At the modified system, Delta = At
-- A, Delta_R and Delta_J its numerical dissipation and interconnection, Ahat and Ehat the pair of a
-scheme, T_i the local defect, |.| the Euclidean and ||.|| the spectral norm.
+structures (the audit lists theorems only), and by "(+)" if they are private lemmas, which the audit
+cannot name. Each name is preceded by the file of its module in the folder CoSimFoundations.
+Formulas are written in plain text: A_0 = diag(A_i) and A_c are the block-diagonal and the coupling
+part of A, A_sig the signed coupling with the blocks sig_ik A_ik, sig_ik = +1 if k runs at an
+earlier stage than i and -1 otherwise, sigma_ik = (sig_ik + 1)/2, U = exp(H A), At the modified
+system, Delta = At - A, Delta_R and Delta_J its numerical dissipation and interconnection, Ahat and
+Ehat the pair of a scheme, T_i the local defect, |.| the Euclidean and ||.|| the spectral norm.
 
 ------------------------------------------ Status values -------------------------------------------
 
@@ -494,12 +494,12 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
      label    : cor:offsets, eq:tree
      statement: The eigenvalues xi of the one-step map of every scheme are the roots of det(xi I - F
                 - sqrt(xi) G C) = 0.
-     Lean     : Offsets.lean: HeldScheme.IsStageOffset (def), HeldScheme.IsStageOffset.isOffset,
-                  HeldScheme.det_sq_sub_X_of_offset, HeldScheme.exists_eigenvector_X_iff_of_offset,
-                  HeldScheme.det_sq_sub_zoh_X_of_offset
-                TreeDeterminant.lean: det_sq_sub_eq_of_potential
-                TreeDeterminantScheme.lean: HeldScheme.det_sq_sub_X_of_potential,
+     Lean     : TreeDeterminantScheme.lean: HeldScheme.IsStageOffset (def),
+                  HeldScheme.det_sq_sub_zoh_X_of_offset, HeldScheme.det_sq_sub_X_of_potential,
                   HeldScheme.det_sq_sub_X_of_isAcyclic
+                Offsets.lean: HeldScheme.IsStageOffset.isOffset, HeldScheme.det_sq_sub_X_of_offset,
+                  HeldScheme.exists_eigenvector_X_iff_of_offset
+                TreeDeterminant.lean: det_sq_sub_eq_of_potential
      explicit : Integer offsets (offsets with p_i - p_k = sig_ik are integers up to one constant on
                 each component of the coupling graph).
      note     : det(s^2 I - X) = det(s^2 I - F - s (N + M)) for every s in a field that contains the
@@ -550,8 +550,8 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
                   HeldScheme.exists_units_conj_zoh_restage, exists_units_conj_infoStep_of_isAcyclic,
                   exists_units_conj_infoStep_block, orderProd_blockStep_eq_infoStep
                 TreeDeterminant.lean: charpoly_infoStep_eq_of_isAcyclic
-                TreeDeterminantScheme.lean: HeldScheme.charpoly_zoh_restage_eq
-                Offsets.lean: HeldScheme.charpoly_zoh_restage_eq_of_offset
+                TreeDeterminantScheme.lean: HeldScheme.charpoly_zoh_restage_eq,
+                  HeldScheme.charpoly_zoh_restage_eq_of_offset
                 SimilarOrders.lean: isConj_orderProd_of_isAcyclic
                 SimilarOrdersScheme.lean: exists_units_conj_infoStep
      explicit : The two schemes have F and the sum G C of the sample coefficients in common (the
@@ -1018,7 +1018,8 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
      label    : (text)
      statement: [Delta_J]_ij = (1/4) H sum_k (sig_ik - sig_jk) A_ik A_kj + O(H^2).
      Lean     : DifferenceLeadHalfStep.lean: HeldScheme.Consistent.numInterconnection_block
-                LegRule.lean: HeldScheme.sg_eq_sg_of_iff, HeldScheme.sg_eq_neg_sg_of_not_iff
+                LegRule.lean: HeldScheme.sg_eq_sg_of_iff
+                ForcedBlock.lean: HeldScheme.sg_eq_neg_sg_of_not_iff
      explicit : Power-conjugate ports; the range of (C3).
      note     : "Runs between" is the statement that the two signs are opposite.
 
@@ -1039,9 +1040,10 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
      label    : thm:triple, eq:triple
      statement: For orthogonal unit vectors e, e' with the mean mubar = (e^T Delta_R e + e'^T
                 Delta_R e')/2: iota >= |e^T Delta_R e'| - mubar and mu >= |e^T Delta_R e'| + mubar.
-     Lean     : PairTrade.lean: pair_trade_iota, pair_trade_mu, pair_trade_spread,
-                  pair_trade_iota_matrix, pair_trade_mu_matrix, pair_trade_spread_matrix,
-                  pair_trade_iota_opE, pair_trade_mu_opE, abs_inner_add_inner_add_le_mu
+     Lean     : PairTrade.lean: pair_trade_iota, pair_trade_mu, pair_trade_iota_matrix,
+                  pair_trade_mu_matrix, pair_trade_iota_opE, pair_trade_mu_opE,
+                  abs_inner_add_inner_add_le_mu
+                SpreadLaw.lean: two_mul_abs_inner_le_spread, spread_law_symm
      note     : For every symmetric operator on a real inner product space and every bound iota, mu
                 of its quadratic form (C5).
 
@@ -1110,8 +1112,8 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
 [092] Corollary 5.4 (graph and order) (i): Jacobi scheme                                        FULL
      label    : cor:graph
      statement: In a Jacobi scheme no subsystem runs between two of its partners.
-     Lean     : GraphOrder.lean: HeldScheme.sg_of_jacobi
-                LegRule.lean: HeldScheme.sg_eq_sg_of_iff, HeldScheme.sg_eq_neg_sg_of_not_iff
+     Lean     : ForcedBlock.lean: HeldScheme.sg_of_jacobi, HeldScheme.sg_eq_neg_sg_of_not_iff
+                LegRule.lean: HeldScheme.sg_eq_sg_of_iff
      note     : In a Jacobi scheme all signs are -1; "k runs between i and j" is sig_jk = -sig_ik.
 
 [093] Corollary 5.4 (i): three or more partners                                                 FULL
@@ -1228,8 +1230,8 @@ PART 1. THE STATEMENTS OF THE PAPER, IN THE ORDER OF THE PAPER
 [104] Proposition 5.7: the second term                                                       PARTIAL
      label    : prop:lent
      statement: The second term is absent exactly if no two partners share a stage.
-     Lean     : ReversedOrder.lean: HeldScheme.parCoupling_eq_zero_of_partner
-                StoredEnergy.lean: HeldScheme.parCoupling_eq_zero, HeldScheme.parCoupling_apply
+     Lean     : StoredEnergy.lean: HeldScheme.parCoupling_eq_zero_of_partner,
+                  HeldScheme.parCoupling_eq_zero, HeldScheme.parCoupling_apply
      note     : Formalised: A_par = 0 if no two partners share a stage. The converse is not a
                 declaration; A_par consists of the blocks between subsystems at one stage
                 (parCoupling_apply).
@@ -1419,7 +1421,7 @@ has no row.
 
 Rows on numbered statements and numbered equations: 94.  FULL 63, PARTIAL 16, SPECIAL 4, NONE 11.
 Rows on statements of the running text: 25.  FULL 12, PARTIAL 11, SPECIAL 1, NONE 1.
-Modules cited in the rows: 79 of 101; declarations cited: 494.
+Modules cited in the rows: 79 of 101; declarations cited: 492.
 
 ====================================================================================================
 PART 2. STATEMENTS OF THE RUNNING TEXT WITHOUT A LEAN STATEMENT

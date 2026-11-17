@@ -300,10 +300,8 @@ theorem hasSum_phiOne (Z : Matrix (Fin n) (Fin n) ℝ) :
 
 /-- **The bridge to `Phi`:** the operator of `φ₁` of a matrix is `φ₁` of its operator. -/
 theorem opE_phiOne (Z : Matrix (Fin n) (Fin n) ℝ) : opE (phiOne Z) = phi 1 (opE Z) := by
-  have hc : Continuous (toEuclideanCLM (n := Fin n) (𝕜 := ℝ)) :=
-    LinearMap.continuous_of_finiteDimensional
-      (toEuclideanCLM (n := Fin n) (𝕜 := ℝ)).toAlgEquiv.toLinearMap
-  have h := ((hasSum_phiOne Z).map (toEuclideanCLM (n := Fin n) (𝕜 := ℝ)) hc).tsum_eq
+  have h := ((hasSum_phiOne Z).map (toEuclideanCLM (n := Fin n) (𝕜 := ℝ))
+    OneStep.continuous_toEuclideanCLM).tsum_eq
   refine h.symm.trans (tsum_congr fun j => ?_)
   show opE ((((j + 1)! : ℕ) : ℝ)⁻¹ • Z ^ j) = (((j + 1)! : ℕ) : ℝ)⁻¹ • opE Z ^ j
   rw [opE_smul]
@@ -571,6 +569,77 @@ theorem zohOld_add_zohNew (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
     S.zohOld A H + S.zohNew A H = S.zohCoupling A H := by
   ext p q
   by_cases h : S.stage (S.sub q) < S.stage (S.sub p) <;> simp [zohOld, zohNew, h]
+
+/-! ### The coupling by the stages -/
+
+/-- The coupling on the new samples, `A_new`: the entries of the coupling part from a subsystem
+of an earlier stage. -/
+noncomputable def couplingNew (A : Matrix (Fin n) (Fin n) ℝ) : Matrix (Fin n) (Fin n) ℝ :=
+  Matrix.of fun p q => if S.stage (S.sub q) < S.stage (S.sub p) then S.coupling A p q else 0
+
+/-- The coupling on the old samples, `A_old`: the entries of the coupling part from a subsystem
+that does not run at an earlier stage. -/
+noncomputable def couplingOld (A : Matrix (Fin n) (Fin n) ℝ) : Matrix (Fin n) (Fin n) ℝ :=
+  Matrix.of fun p q => if S.stage (S.sub q) < S.stage (S.sub p) then 0 else S.coupling A p q
+
+/-- The entries of the coupling on the new samples. -/
+theorem couplingNew_apply (A : Matrix (Fin n) (Fin n) ℝ) (p q : Fin n) :
+    S.couplingNew A p q =
+      if S.stage (S.sub q) < S.stage (S.sub p) then S.coupling A p q else 0 := rfl
+
+/-- The entries of the coupling on the old samples. -/
+theorem couplingOld_apply (A : Matrix (Fin n) (Fin n) ℝ) (p q : Fin n) :
+    S.couplingOld A p q =
+      if S.stage (S.sub q) < S.stage (S.sub p) then 0 else S.coupling A p q := rfl
+
+/-- `A_old + A_new = A_c`. -/
+theorem couplingOld_add_couplingNew (A : Matrix (Fin n) (Fin n) ℝ) :
+    S.couplingOld A + S.couplingNew A = S.coupling A := by
+  ext p q
+  rw [Matrix.add_apply, S.couplingOld_apply, S.couplingNew_apply]
+  split_ifs <;> simp
+
+/-- **The signed coupling is the coupling on the new samples minus that on the old ones:**
+`A_new - A_old = A_ς`. -/
+theorem couplingNew_sub_couplingOld (A : Matrix (Fin n) (Fin n) ℝ) :
+    S.couplingNew A - S.couplingOld A = S.signedCoupling A := by
+  ext p q
+  rw [Matrix.sub_apply, S.couplingOld_apply, S.couplingNew_apply, S.signedCoupling_apply,
+    S.coupling_apply]
+  by_cases hpq : S.sub p = S.sub q
+  · simp [hpq]
+  · by_cases h : S.stage (S.sub q) < S.stage (S.sub p)
+    · simp [hpq, h, sg]
+    · simp [hpq, h, sg]
+
+/-- A block-diagonal matrix commutes with the cut of the coupling along the stages: the entries
+of `K A_c` from an earlier stage are those of `K A_new`. -/
+theorem zohNew_eq (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
+    S.zohNew A H = S.zohKernel A H * S.couplingNew A := by
+  ext p q
+  have hterm : ∀ r, S.zohKernel A H p r * S.couplingNew A r q =
+      if S.stage (S.sub q) < S.stage (S.sub p) then S.zohKernel A H p r * S.coupling A r q
+      else 0 := by
+    intro r
+    by_cases hr : S.sub p = S.sub r
+    · rw [S.couplingNew_apply, ← hr]
+      by_cases h : S.stage (S.sub q) < S.stage (S.sub p)
+      · rw [ite_eq_left h, ite_eq_left h]
+      · rw [ite_eq_right h, ite_eq_right h, mul_zero]
+    · rw [S.zohKernel_apply_eq_zero A H hr, zero_mul, zero_mul, ite_self]
+  rw [Matrix.mul_apply, Finset.sum_congr rfl fun r _ => hterm r]
+  by_cases h : S.stage (S.sub q) < S.stage (S.sub p)
+  · simp [zohNew, zohCoupling, Matrix.mul_apply, h]
+  · simp [zohNew, h]
+
+/-- The entries of `K A_c` that are not from an earlier stage are those of `K A_old`. -/
+theorem zohOld_eq (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
+    S.zohOld A H = S.zohKernel A H * S.couplingOld A := by
+  have h := S.zohOld_add_zohNew A H
+  rw [S.zohNew_eq, zohCoupling, ← S.couplingOld_add_couplingNew, mul_add] at h
+  exact add_right_cancel h
+
+/-! ### The pattern of the two parts -/
 
 /-- The part on the new samples has the pattern that `HeldScheme` requires of `N`. -/
 theorem zohNew_apply_eq_zero {A : Matrix (Fin n) (Fin n) ℝ}

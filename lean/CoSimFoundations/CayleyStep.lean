@@ -63,26 +63,26 @@ theorem one_sub_mul_add_one (hmid : E * (X - 1) = (H / 2) • (A * (X + 1)))
   rw [Matrix.mul_add, Matrix.mul_one, one_sub_mul_step hmid hE, two_smul]
   abel
 
-/-- `1 - (H/2) M` is invertible. -/
-theorem isUnit_det_one_sub [NeZero (2 : K)] (hmid : E * (X - 1) = (H / 2) • (A * (X + 1)))
-    (hE : IsUnit E.det) : IsUnit (1 - (H / 2) • (E⁻¹ * A)).det := by
+/-- `det (1 - (H/2) M) · det (X + 1) ≠ 0`: the product `(1 - (H/2) M) (X + 1)` is twice the unit
+matrix, and `2 ≠ 0` in the field. -/
+theorem det_one_sub_mul_det_add_one_ne_zero [NeZero (2 : K)]
+    (hmid : E * (X - 1) = (H / 2) • (A * (X + 1))) (hE : IsUnit E.det) :
+    (1 - (H / 2) • (E⁻¹ * A)).det * (X + 1).det ≠ 0 := by
   have h := congrArg Matrix.det (one_sub_mul_add_one hmid hE)
   rw [Matrix.det_mul, Matrix.det_smul, Matrix.det_one, mul_one] at h
-  have h2 : (1 - (H / 2) • (E⁻¹ * A)).det * (X + 1).det ≠ 0 := by
-    rw [h]
-    exact pow_ne_zero _ (NeZero.ne 2)
-  exact isUnit_iff_ne_zero.2 (left_ne_zero_of_mul h2)
+  rw [h]
+  exact pow_ne_zero _ (NeZero.ne 2)
+
+/-- `1 - (H/2) M` is invertible. -/
+theorem isUnit_det_one_sub [NeZero (2 : K)] (hmid : E * (X - 1) = (H / 2) • (A * (X + 1)))
+    (hE : IsUnit E.det) : IsUnit (1 - (H / 2) • (E⁻¹ * A)).det :=
+  isUnit_iff_ne_zero.2 (left_ne_zero_of_mul (det_one_sub_mul_det_add_one_ne_zero hmid hE))
 
 /-- **The one-step map does not have the eigenvalue `-1` if `E` is invertible:** `X + 1` is
 invertible. -/
 theorem isUnit_det_add_one [NeZero (2 : K)] (hmid : E * (X - 1) = (H / 2) • (A * (X + 1)))
-    (hE : IsUnit E.det) : IsUnit (X + 1).det := by
-  have h := congrArg Matrix.det (one_sub_mul_add_one hmid hE)
-  rw [Matrix.det_mul, Matrix.det_smul, Matrix.det_one, mul_one] at h
-  have h2 : (1 - (H / 2) • (E⁻¹ * A)).det * (X + 1).det ≠ 0 := by
-    rw [h]
-    exact pow_ne_zero _ (NeZero.ne 2)
-  exact isUnit_iff_ne_zero.2 (right_ne_zero_of_mul h2)
+    (hE : IsUnit E.det) : IsUnit (X + 1).det :=
+  isUnit_iff_ne_zero.2 (right_ne_zero_of_mul (det_one_sub_mul_det_add_one_ne_zero hmid hE))
 
 /-- **The one-step map is the Cayley transform of `M = E⁻¹ A`** (the paper, `cor:stability`):
 `X = (1 - (H/2) M)⁻¹ (1 + (H/2) M)`. -/

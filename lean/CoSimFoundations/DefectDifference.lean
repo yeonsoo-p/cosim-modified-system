@@ -55,28 +55,36 @@ theorem defect_sub_one_eq_integral (At A : 𝔸) (H : ℝ) :
   rw [h]
   simp [exp_zero]
 
+/-- **The defect against a bound of the integrand.** If
+`‖exp (τ • Ã)‖ ‖Ã - A‖ ‖exp (τ • (-A))‖ ≤ c` for `0 ≤ τ ≤ H`, then
+`‖exp (H • Ã) * exp (H • (-A)) - 1‖ ≤ H c`: the defect is the integral of
+`exp (τ • Ã) * (Ã - A) * exp (τ • (-A))` over the step. -/
+theorem norm_defect_sub_one_le_of_bound (At A : 𝔸) {H c : ℝ} (hH : 0 ≤ H)
+    (hc : ∀ τ ∈ Set.Icc 0 H, ‖exp (τ • At)‖ * ‖At - A‖ * ‖exp (τ • (-A))‖ ≤ c) :
+    ‖exp (H • At) * exp (H • (-A)) - 1‖ ≤ H * c := by
+  rw [defect_sub_one_eq_integral]
+  have hbound : ∀ τ ∈ Set.uIoc (0 : ℝ) H,
+      ‖exp (τ • At) * (At - A) * exp (τ • (-A))‖ ≤ c := by
+    intro τ hτ
+    rw [Set.uIoc_of_le hH] at hτ
+    exact ((norm_mul_le _ _).trans
+      (mul_le_mul_of_nonneg_right (norm_mul_le _ _) (norm_nonneg _))).trans
+      (hc τ ⟨hτ.1.le, hτ.2⟩)
+  have h := intervalIntegral.norm_integral_le_of_norm_le_const hbound
+  rw [sub_zero, abs_of_nonneg hH] at h
+  rw [mul_comm]
+  exact h
+
 /-- **Accuracy is at most the step times the size of the difference**, up to the growth of the
 two flows over the step. -/
 theorem norm_defect_sub_one_le (At A : 𝔸) {H a b : ℝ} (hH : 0 ≤ H)
     (ha : ∀ τ ∈ Set.Icc 0 H, ‖exp (τ • At)‖ ≤ a) (hb : ∀ τ ∈ Set.Icc 0 H, ‖exp (τ • (-A))‖ ≤ b) :
     ‖exp (H • At) * exp (H • (-A)) - 1‖ ≤ H * (a * ‖At - A‖ * b) := by
-  rw [defect_sub_one_eq_integral]
-  have hbound : ∀ τ ∈ Set.uIoc (0 : ℝ) H,
-      ‖exp (τ • At) * (At - A) * exp (τ • (-A))‖ ≤ a * ‖At - A‖ * b := by
-    intro τ hτ
-    rw [Set.uIoc_of_le hH] at hτ
-    have hmem : τ ∈ Set.Icc 0 H := ⟨hτ.1.le, hτ.2⟩
-    have ha' := ha τ hmem
-    have hb' := hb τ hmem
-    have ha0 : 0 ≤ a := (norm_nonneg _).trans ha'
-    calc ‖exp (τ • At) * (At - A) * exp (τ • (-A))‖
-        ≤ ‖exp (τ • At)‖ * ‖At - A‖ * ‖exp (τ • (-A))‖ :=
-          (norm_mul_le _ _).trans (mul_le_mul_of_nonneg_right (norm_mul_le _ _) (norm_nonneg _))
-      _ ≤ a * ‖At - A‖ * b := by gcongr
-  have h := intervalIntegral.norm_integral_le_of_norm_le_const hbound
-  rw [sub_zero, abs_of_nonneg hH] at h
-  rw [mul_comm]
-  exact h
+  refine norm_defect_sub_one_le_of_bound At A hH fun τ hτ => ?_
+  have ha' := ha τ hτ
+  have hb' := hb τ hτ
+  have ha0 : 0 ≤ a := (norm_nonneg _).trans ha'
+  gcongr
 
 /-- **A floor under the accuracy is a floor under the difference.** -/
 theorem floor_div_le_norm_difference (At A : 𝔸) {H a b f : ℝ} (hH : 0 < H) (hab : 0 < a * b)

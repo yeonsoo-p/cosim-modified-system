@@ -45,16 +45,6 @@ section Identity
 
 variable {𝔸 : Type*} [NormedRing 𝔸] [NormedAlgebra ℝ 𝔸] [CompleteSpace 𝔸]
 
-/-- `exp x * exp (-x) = 1`. -/
-theorem exp_mul_exp_neg (x : 𝔸) : exp x * exp (-x) = 1 := by
-  let _ : NormedAlgebra ℚ 𝔸 := NormedAlgebra.restrictScalars ℚ ℝ 𝔸
-  rw [← exp_add_of_commute (Commute.refl x).neg_right, add_neg_cancel, exp_zero]
-
-/-- `exp (-x) * exp x = 1`. -/
-theorem exp_neg_mul_exp (x : 𝔸) : exp (-x) * exp x = 1 := by
-  let _ : NormedAlgebra ℚ 𝔸 := NormedAlgebra.restrictScalars ℚ ℝ 𝔸
-  rw [← exp_add_of_commute (Commute.refl x).neg_left, neg_add_cancel, exp_zero]
-
 /-- **Staggered readout, the identity** (the paper, Proposition 4.8, equation (staggered)): with
 `X = exp (H b) * exp (H a)` and `W = exp ((H/2) a)`, whose inverse is `exp (-(H/2) a)`
 (`exp_mul_exp_neg`, `exp_neg_mul_exp`), `W X W⁻¹ = exp ((H/2) a) * exp (H b) * exp ((H/2) a)`. -/

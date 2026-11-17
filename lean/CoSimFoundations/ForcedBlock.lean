@@ -127,16 +127,18 @@ theorem mul_diagonal_mul_apply (A B : Matrix (Fin n) (Fin n) ℝ) (v : Fin n →
   rw [Matrix.mul_apply]
   simp only [Matrix.mul_diagonal]
 
+/-- The map from the matrices to their operators on Euclidean space is continuous. -/
+theorem continuous_toEuclideanCLM : Continuous (toEuclideanCLM (n := Fin n) (𝕜 := ℝ)) :=
+  LinearMap.continuous_of_finiteDimensional
+    (toEuclideanCLM (n := Fin n) (𝕜 := ℝ)).toAlgEquiv.toLinearMap
+
 /-- The operator of the exponential of a matrix is the exponential of its operator. -/
 theorem opE_exp (A : Matrix (Fin n) (Fin n) ℝ) :
     opE (NormedSpace.exp A) = NormedSpace.exp (opE A) := by
   open scoped Matrix.Norms.Operator in
   let _ : NormedAlgebra ℚ (Matrix (Fin n) (Fin n) ℝ) :=
     NormedAlgebra.restrictScalars ℚ ℝ (Matrix (Fin n) (Fin n) ℝ)
-  have hc : Continuous (toEuclideanCLM (n := Fin n) (𝕜 := ℝ)) :=
-    LinearMap.continuous_of_finiteDimensional
-      (toEuclideanCLM (n := Fin n) (𝕜 := ℝ)).toAlgEquiv.toLinearMap
-  exact NormedSpace.map_exp (toEuclideanCLM (n := Fin n) (𝕜 := ℝ)) hc A
+  exact NormedSpace.map_exp (toEuclideanCLM (n := Fin n) (𝕜 := ℝ)) continuous_toEuclideanCLM A
 
 /-- `‖U - 1‖ ≤ ‖A‖ e^{H‖A‖} · H` for `U = exp (H • A)`, `H ≥ 0`. -/
 theorem norm_opE_exp_sub_one_le (A : Matrix (Fin n) (Fin n) ℝ) {H : ℝ} (hH : 0 ≤ H) :
@@ -164,20 +166,28 @@ theorem inner_opE_eq_sum (T : Matrix (Fin n) (Fin n) ℝ) (x y : EuclideanSpace 
   rw [inner_toEuclideanCLM]
   simp [dotProduct, mulVec, Finset.mul_sum, mul_assoc]
 
+/-- Two matrices have the same matrix element between `x` and `y` if their entries agree wherever
+the components of `x` and of `y` do not vanish. -/
+theorem inner_opE_congr_of_ne_zero {x y : EuclideanSpace ℝ (Fin n)}
+    {T T' : Matrix (Fin n) (Fin n) ℝ} (h : ∀ p q, x p ≠ 0 → y q ≠ 0 → T p q = T' p q) :
+    ⟪x, opE T y⟫ = ⟪x, opE T' y⟫ := by
+  rw [inner_opE_eq_sum, inner_opE_eq_sum]
+  refine Finset.sum_congr rfl fun p _ => Finset.sum_congr rfl fun q _ => ?_
+  by_cases hp : x p = 0
+  · rw [hp, zero_mul, zero_mul, zero_mul, zero_mul]
+  · by_cases hq : y q = 0
+    · rw [hq, mul_zero, mul_zero]
+    · rw [h p q hp hq]
+
 /-- A matrix element between vectors supported on two subsystems depends only on the block of the
 matrix between the two. -/
 theorem inner_opE_congr {κ : Type*} {sub : Fin n → κ} {s t : κ}
     {x y : EuclideanSpace ℝ (Fin n)} (hx : ∀ p, sub p ≠ s → x p = 0)
     (hy : ∀ q, sub q ≠ t → y q = 0) {T T' : Matrix (Fin n) (Fin n) ℝ}
     (h : ∀ p q, sub p = s → sub q = t → T p q = T' p q) :
-    ⟪x, opE T y⟫ = ⟪x, opE T' y⟫ := by
-  rw [inner_opE_eq_sum, inner_opE_eq_sum]
-  refine Finset.sum_congr rfl fun p _ => Finset.sum_congr rfl fun q _ => ?_
-  by_cases hp : sub p = s
-  · by_cases hq : sub q = t
-    · rw [h p q hp hq]
-    · rw [hy q hq, mul_zero, mul_zero]
-  · rw [hx p hp, zero_mul, zero_mul, zero_mul, zero_mul]
+    ⟪x, opE T y⟫ = ⟪x, opE T' y⟫ :=
+  inner_opE_congr_of_ne_zero fun p q hp hq =>
+    h p q (not_imp_comm.1 (hx p) hp) (not_imp_comm.1 (hy q) hq)
 
 /-- `|⟪x, T y⟫| ≤ ‖T‖ ‖x‖ ‖y‖`. -/
 theorem abs_inner_opE_le (T : Matrix (Fin n) (Fin n) ℝ) (x y : EuclideanSpace ℝ (Fin n)) :
@@ -245,6 +255,68 @@ def sg (s k : κ) : ℝ := if S.stage k < S.stage s then 1 else -1
 /-- The diagonal matrix of the signs `ς_{s, sub r}`. -/
 def sgn (s : κ) : Matrix (Fin n) (Fin n) ℝ := diagonal fun r => S.sg s (S.sub r)
 
+/-- Between two subsystems at the same stage the sign is `-1`: each uses a held sample of the
+other. -/
+theorem sg_of_stage_eq {s k : κ} (h : S.stage s = S.stage k) : S.sg s k = -1 := by
+  have hn : ¬ S.stage k < S.stage s := by
+    rw [h]
+    exact lt_irrefl _
+  unfold sg
+  exact ite_eq_right hn
+
+/-- In Jacobi mode all signs are `-1`. -/
+theorem sg_of_jacobi {S : HeldScheme n κ} (hJ : ∀ s t, S.stage s = S.stage t) (s k : κ) :
+    S.sg s k = -1 :=
+  S.sg_of_stage_eq (hJ s k)
+
+/-- The square of a sign is one. -/
+theorem abs_sg (s k : κ) : |S.sg s k| = 1 := by
+  by_cases h : S.stage k < S.stage s <;> simp [sg, h]
+
+/-- If `k` runs before exactly one of `i` and `j` (it runs between them), the two signs towards
+`k` are opposite: `ς_{jk} = -ς_{ik}`. -/
+theorem sg_eq_neg_sg_of_not_iff {i j k : κ}
+    (h : ¬ (S.stage k < S.stage i ↔ S.stage k < S.stage j)) : S.sg j k = -S.sg i k := by
+  unfold sg
+  by_cases hi : S.stage k < S.stage i
+  · have hj : ¬ S.stage k < S.stage j := fun hj => h ⟨fun _ => hj, fun _ => hi⟩
+    rw [ite_eq_left hi, ite_eq_right hj]
+  · have hj : S.stage k < S.stage j := by
+      by_contra hj
+      exact h ⟨fun e => absurd e hi, fun e => absurd e hj⟩
+    rw [ite_eq_right hi, ite_eq_left hj, neg_neg]
+
+/-- If `k` runs before exactly one of `s` and `t`, the two signs towards `k` cancel:
+`ς_{sk} + ς_{tk} = 0`. -/
+theorem sg_add_sg_eq_zero {s t k : κ}
+    (h : S.stage k < S.stage s ↔ ¬ S.stage k < S.stage t) : S.sg s k + S.sg t k = 0 := by
+  rw [S.sg_eq_neg_sg_of_not_iff (i := s) (j := t) fun h' => iff_not_self (h'.symm.trans h),
+    add_neg_cancel]
+
+/-- `|tr T| ≤ n K` for an `n × n` matrix whose diagonal entries are at most `K` in modulus. -/
+theorem abs_trace_le_of_diag {T : Matrix (Fin n) (Fin n) ℝ} {K : ℝ} (h : ∀ p, |T p p| ≤ K) :
+    |Matrix.trace T| ≤ (n : ℝ) * K := by
+  rw [Matrix.trace]
+  refine (Finset.abs_sum_le_sum_abs _ _).trans ?_
+  have h1 : ∑ p, |Matrix.diag T p| ≤ ∑ _p : Fin n, K := Finset.sum_le_sum fun p _ => h p
+  refine h1.trans_eq ?_
+  rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul]
+
+/-- `|tr T| ≤ n ‖T‖` in the spectral norm. -/
+theorem _root_.CoSimFoundations.OneStep.abs_trace_le (T : Matrix (Fin n) (Fin n) ℝ) :
+    |T.trace| ≤ n * ‖opE T‖ := by
+  refine abs_trace_le_of_diag fun p => ?_
+  have h2 := abs_inner_opE_le T (unitE p) (unitE p)
+  rwa [inner_unitE_opE, norm_unitE, mul_one, mul_one] at h2
+
+/-- States `p` of a subsystem `s` and `q` of a subsystem `t ≠ s` that is not a partner of `s`:
+their subsystems differ and are not partners, and the states differ. -/
+theorem sub_ne_of_eq {s t : κ} (hst : s ≠ t) (hnp : ¬ S.partner s t) {p q : Fin n}
+    (hp : S.sub p = s) (hq : S.sub q = t) :
+    S.sub p ≠ S.sub q ∧ ¬ S.partner (S.sub p) (S.sub q) ∧ p ≠ q := by
+  subst hp hq
+  exact ⟨hst, hnp, fun h => hst (congrArg S.sub h)⟩
+
 /-- The signs are twice the mask of the early stages minus one: `ς_s = 2 early_s - 1`. -/
 theorem sgn_eq (s : κ) : S.sgn s = (2 : ℝ) • S.early s - 1 := by
   ext p q
@@ -297,6 +369,23 @@ theorem coupling_eq (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) {p q : Fin n}
   simp only [Matrix.sub_apply, Matrix.smul_apply, Matrix.one_apply_ne hpq, smul_eq_mul]
   linarith
 
+/-- **The new samples from the coupling coefficients.** If `M + N = H A + E` between different
+subsystems, then `N p r = H A p r + E p r` if the subsystem of `r` runs before the subsystem of
+`p`, and `N p r = 0` if not. -/
+theorem N_apply_eq_ite {A E : Matrix (Fin n) (Fin n) ℝ} {H : ℝ}
+    (hE : ∀ p q, S.sub p ≠ S.sub q → S.M p q + S.N p q = H * A p q + E p q) (p r : Fin n) :
+    S.N p r =
+      (if S.stage (S.sub r) < S.stage (S.sub p) then 1 else 0) * (H * A p r + E p r) := by
+  by_cases hr : S.stage (S.sub r) < S.stage (S.sub p)
+  · have hpr : S.sub p ≠ S.sub r := fun h => by
+      rw [h] at hr
+      exact lt_irrefl _ hr
+    have hM0 : S.M p r = 0 := S.hM p r (fun h => h.2 hr)
+    simp only [hr, ↓reduceIte, one_mul]
+    rw [← hE p r hpr, hM0, zero_add]
+  · simp only [hr, ↓reduceIte, zero_mul]
+    exact S.hN p r (fun h => hr h.2)
+
 /-- **Expansion with the mask of the early stages.** If `M + N = H A + E` between different
 subsystems, then between two different subsystems that are not partners
 `X = H² A early A + H E early A + N E + N N (X - 1)` entrywise. -/
@@ -307,18 +396,6 @@ theorem entry_expand {A E : Matrix (Fin n) (Fin n) ℝ} {H : ℝ}
       (S.N * E) p q + (S.N * S.N * (S.X - 1)) p q := by
   rw [S.entry_eq_mul hne hnp]
   congr 1
-  have hrow : ∀ r, S.N p r =
-      (if S.stage (S.sub r) < S.stage (S.sub p) then 1 else 0) * (H * A p r + E p r) := by
-    intro r
-    by_cases hr : S.stage (S.sub r) < S.stage (S.sub p)
-    · have hpr : S.sub p ≠ S.sub r := fun h => by
-        rw [h] at hr
-        exact lt_irrefl _ hr
-      have hM0 : S.M p r = 0 := S.hM p r (fun h => h.2 hr)
-      simp only [hr, ↓reduceIte, one_mul]
-      rw [← hE p r hpr, hM0, zero_add]
-    · simp only [hr, ↓reduceIte, zero_mul]
-      exact S.hN p r (fun h => hr h.2)
   have hcol : ∀ r, S.N p r * (S.M + S.N) r q = S.N p r * (H * A r q + E r q) := by
     intro r
     by_cases hr : S.sub r = S.sub q
@@ -328,7 +405,19 @@ theorem entry_expand {A E : Matrix (Fin n) (Fin n) ℝ} {H : ℝ}
   rw [Matrix.mul_apply, Finset.sum_congr rfl (fun r _ => hcol r)]
   simp only [early, mul_diagonal_mul_apply, hNE, Finset.mul_sum, ← Finset.sum_add_distrib]
   refine Finset.sum_congr rfl fun r _ => ?_
-  linear_combination (H * A r q) * hrow r
+  linear_combination (H * A r q) * S.N_apply_eq_ite hE p r
+
+/-- `‖H E early_s A‖ ≤ H (d H² · 1 · ‖A‖)` for `H ≥ 0` and `‖E‖ ≤ d H²`: the mask of the early
+stages has norm at most one. -/
+theorem norm_opE_smul_mul_early_mul_le {E : Matrix (Fin n) (Fin n) ℝ} {H d : ℝ} (hH : 0 ≤ H)
+    (hd : ‖opE E‖ ≤ d * H ^ 2) (A : Matrix (Fin n) (Fin n) ℝ) (s : κ) :
+    ‖opE (H • (E * S.early s * A))‖ ≤ H * (d * H ^ 2 * 1 * ‖opE A‖) := by
+  rw [opE_smul, norm_smul, Real.norm_of_nonneg hH, opE_mul, opE_mul]
+  refine mul_le_mul_of_nonneg_left ?_ hH
+  refine (norm_mul_le _ _).trans ?_
+  refine mul_le_mul_of_nonneg_right ?_ (norm_nonneg _)
+  refine (norm_mul_le _ _).trans ?_
+  exact mul_le_mul hd (S.norm_opE_early_le s) (norm_nonneg _) ((norm_nonneg _).trans hd)
 
 /-- The constant of the forced block: `a² b + d (a + α) + α³/6 · e^{Hα}`, with `‖N‖ ≤ a H`,
 `‖X - 1‖ ≤ b H`, `‖E‖ ≤ d H²`, `α = ‖A‖`. -/
@@ -355,9 +444,7 @@ theorem forced_block_of_coupling {A U E : Matrix (Fin n) (Fin n) ℝ} {H a b d :
   have key : ∀ p q, S.sub p = s → S.sub q = t →
       (S.X - U - (H ^ 2 / 2) • (A * S.sgn s * A)) p q = T p q := by
     intro p q hp hq
-    have hne : S.sub p ≠ S.sub q := by rw [hp, hq]; exact hst
-    have hnp' : ¬ S.partner (S.sub p) (S.sub q) := by rw [hp, hq]; exact hnp
-    have hpq : p ≠ q := fun h => hne (h ▸ rfl)
+    obtain ⟨hne, hnp', hpq⟩ := S.sub_ne_of_eq hst hnp hp hq
     have hX := S.entry_expand hE hne hnp'
     rw [hp] at hX
     have hUR : U p q = R p q + H ^ 2 / 2 * (A * A) p q := by
@@ -381,14 +468,7 @@ theorem forced_block_of_coupling {A U E : Matrix (Fin n) (Fin n) ℝ} {H a b d :
     rw [hR, hU]
     exact norm_opE_exp_sub_quadratic_le A hH
   have haH : 0 ≤ a * H := le_trans (norm_nonneg _) ha
-  have hdH : 0 ≤ d * H ^ 2 := le_trans (norm_nonneg _) hd
-  have h1 : ‖opE (H • (E * S.early s * A))‖ ≤ H * (d * H ^ 2 * 1 * ‖opE A‖) := by
-    rw [opE_smul, norm_smul, Real.norm_of_nonneg hH, opE_mul, opE_mul]
-    refine mul_le_mul_of_nonneg_left ?_ hH
-    refine (norm_mul_le _ _).trans ?_
-    refine mul_le_mul_of_nonneg_right ?_ (norm_nonneg _)
-    refine (norm_mul_le _ _).trans ?_
-    exact mul_le_mul hd (S.norm_opE_early_le s) (norm_nonneg _) hdH
+  have h1 := S.norm_opE_smul_mul_early_mul_le hH hd A s
   have h2 : ‖opE (S.N * E)‖ ≤ a * H * (d * H ^ 2) := by
     rw [opE_mul]
     exact (norm_mul_le _ _).trans (mul_le_mul ha hd (norm_nonneg _) haH)

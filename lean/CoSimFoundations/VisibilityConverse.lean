@@ -146,14 +146,9 @@ theorem exists_rule_of_visBound_eq_zero [∀ i, FiniteDimensional ℝ (Es i)]
 the state `U^{k + σ - r} x_0`, for `r ≤ k`. -/
 theorem pow_mul_inv_pow_apply_pow (hU : Ui * U = 1) (s : ℕ) {r k : ℕ} (hr : r ≤ k) (x0 : E) :
     (U ^ s) ((Ui ^ r) ((U ^ k) x0)) = (U ^ (k + s - r)) x0 := by
-  have h : ∀ r : ℕ, Ui ^ r * U ^ r = 1 := by
-    intro r
-    induction r with
-    | zero => simp
-    | succ r ih => rw [pow_succ, pow_succ', mul_assoc, ← mul_assoc Ui, hU, one_mul, ih]
   obtain ⟨j, rfl⟩ := Nat.exists_eq_add_of_le hr
   have h1 : U ^ s * (Ui ^ r * U ^ (r + j)) = U ^ (r + j + s - r) := by
-    rw [pow_add U r j, ← mul_assoc (Ui ^ r), h r, one_mul, ← pow_add]
+    rw [pow_add U r j, ← mul_assoc (Ui ^ r), pow_mul_pow_eq_one r hU, one_mul, ← pow_add]
     congr 1
     omega
   rw [← h1]

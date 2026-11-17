@@ -42,15 +42,9 @@ theorem injective_of_mul_vandermonde (hW : W * Matrix.vandermonde x = 1) :
 /-- At the nodes `s^l` is the combination of the lower powers: `x_q^l = Σ_p β_p x_q^p`. -/
 theorem pow_node_eq_sum (hW : W * Matrix.vandermonde x = 1) (q : Fin l) :
     x q ^ l = ∑ p : Fin l, ddBeta x W p * x q ^ (p : ℕ) := by
-  have hV : Matrix.vandermonde x * W = 1 := mul_eq_one_comm.1 hW
-  have h1 : ∀ q' : Fin l, ∑ p : Fin l, x q ^ (p : ℕ) * W p q' = if q = q' then 1 else 0 :=
-    fun q' => by
-      have h2 := congrFun (congrFun hV q) q'
-      rw [Matrix.mul_apply, Matrix.one_apply] at h2
-      exact h2
   calc x q ^ l = ∑ q' : Fin l, (if q = q' then (1 : ℝ) else 0) * x q' ^ l := by simp
     _ = ∑ q' : Fin l, (∑ p : Fin l, x q ^ (p : ℕ) * W p q') * x q' ^ l :=
-        sum_congr rfl fun q' _ => by rw [h1]
+        sum_congr rfl fun q' _ => by rw [sum_pow_mul_eq hW]
     _ = ∑ p : Fin l, ∑ q' : Fin l, x q ^ (p : ℕ) * W p q' * x q' ^ l := by
         rw [sum_comm]
         exact sum_congr rfl fun q' _ => by rw [sum_mul]

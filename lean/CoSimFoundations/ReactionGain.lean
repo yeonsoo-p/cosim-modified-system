@@ -35,6 +35,7 @@ Only this identity is formalised here, not the step `F_i - e^{H A_i} = H B_i K_i
 the proof.
 -/
 import CoSimFoundations.PairLaws
+import CoSimFoundations.MemoryBound
 import Mathlib.Analysis.SpecificLimits.Normed
 import Mathlib.Analysis.Normed.Operator.NormedSpace
 import Mathlib.Analysis.Normed.Operator.Completeness
@@ -47,11 +48,6 @@ namespace CoSimFoundations
 section Inverse
 
 variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
-
-/-- A left inverse undoes the map. -/
-theorem left_inverse_apply {D D' : E →L[ℝ] E} (hinv : D' * D = 1) (v : E) : D' (D v) = v := by
-  have h := congrArg (fun T : E →L[ℝ] E => T v) hinv
-  simpa using h
 
 /-- For a left inverse `D'` of `D`: `‖D' v - v‖ ≤ ‖D'‖ ‖D - 1‖ ‖v‖`, from
 `D' - 1 = -D' (D - 1)`. -/
@@ -70,15 +66,11 @@ theorem norm_apply_sub_le_of_left_inverse {D D' : E →L[ℝ] E} (hinv : D' * D 
 `1 / (1 - α)`. -/
 theorem norm_le_of_left_inverse {D D' : E →L[ℝ] E} (hinv : D' * D = 1) (hα : ‖D - 1‖ < 1) :
     ‖D'‖ ≤ 1 / (1 - ‖D - 1‖) := by
-  have h1 : ‖D'‖ ≤ 1 + ‖D'‖ * ‖D - 1‖ := by
-    refine D'.opNorm_le_bound (by positivity) fun v => ?_
-    have h2 := norm_apply_sub_le_of_left_inverse hinv v
-    have h3 : ‖D' v‖ ≤ ‖D' v - v‖ + ‖v‖ := by
-      have := norm_add_le (D' v - v) v
-      rwa [sub_add_cancel] at this
-    linarith
-  rw [le_div_iff₀ (sub_pos.2 hα)]
-  linarith
+  rcases subsingleton_or_nontrivial E with hE | hE
+  · rw [ContinuousLinearMap.opNorm_subsingleton]
+    exact div_nonneg zero_le_one (sub_pos.2 hα).le
+  · exact norm_le_of_mul_eq_one (𝔸 := (E →L[ℝ] E)ᵐᵒᵖ) (D := MulOpposite.op D)
+      (D' := MulOpposite.op D') (congrArg MulOpposite.op hinv) hα
 
 /-- For a left inverse `D'` of `D` with `α = ‖D - 1‖ < 1`:
 `‖D' v - v‖ ≤ α / (1 - α) ‖v‖`. -/
@@ -124,17 +116,21 @@ theorem diag_gain_inv (D D' U : E →L[ℝ] E) (hinv : D' * D = 1) (hα : ‖D -
     rwa [he, one_mul] at h
   linarith
 
+/-- In a complete space a map at distance less than one from the identity is invertible. -/
+theorem isUnit_of_norm_sub_one_lt_one [CompleteSpace E] {D : E →L[ℝ] E} (hα : ‖D - 1‖ < 1) :
+    IsUnit D := by
+  have h := isUnit_one_sub_of_norm_lt_one (x := 1 - D) (by rwa [norm_sub_rev])
+  rwa [sub_sub_cancel] at h
+
 /-- **Theorem 6.2, second inequality, with the inverse.** In a complete space `D` with
 `α = ‖D - 1‖ < 1` is invertible, and with `X = D ∘ U`, a unit vector `e` and
 `g = ⟪e, X e⟫ - ⟪e, U e⟫`: `-g - α / (1 - α) · ‖X e - e‖ ≤ ‖D⁻¹‖ - 1` (`D⁻¹ = Ring.inverse D`). -/
 theorem diag_gain_inverse [CompleteSpace E] (D U : E →L[ℝ] E) (hα : ‖D - 1‖ < 1) {e : E}
     (he : ‖e‖ = 1) :
     -(⟪e, D (U e)⟫ - ⟪e, U e⟫) - ‖D - 1‖ / (1 - ‖D - 1‖) * ‖D (U e) - e‖ ≤
-      ‖Ring.inverse D‖ - 1 := by
-  have hu : IsUnit D := by
-    have h := isUnit_one_sub_of_norm_lt_one (x := 1 - D) (by rwa [norm_sub_rev])
-    rwa [sub_sub_cancel] at h
-  exact diag_gain_inv D (Ring.inverse D) U (Ring.inverse_mul_cancel D hu) hα he
+      ‖Ring.inverse D‖ - 1 :=
+  diag_gain_inv D (Ring.inverse D) U
+    (Ring.inverse_mul_cancel D (isUnit_of_norm_sub_one_lt_one hα)) hα he
 
 /-- A right inverse of a map whose stretch is at least `s > 0` has norm at most `1 / s`. With
 `le_norm_mul_of_left_inverse`: the smallest stretch of an invertible `D` is `1 / ‖D⁻¹‖`. -/
@@ -156,12 +152,6 @@ theorem diag_gain_smin (D D' U : E →L[ℝ] E) (hl : D' * D = 1) (hr : D * D' =
   have h1 : ‖D'‖ ≤ 1 / s := norm_le_of_right_inverse hr hs hD
   have h3 := diag_gain_inv D D' U hl hα he
   linarith
-
-/-- In a complete space a map at distance less than one from the identity is invertible. -/
-theorem isUnit_of_norm_sub_one_lt_one [CompleteSpace E] {D : E →L[ℝ] E} (hα : ‖D - 1‖ < 1) :
-    IsUnit D := by
-  have h := isUnit_one_sub_of_norm_lt_one (x := 1 - D) (by rwa [norm_sub_rev])
-  rwa [sub_sub_cancel] at h
 
 /-- **Theorem 6.2, second inequality, with the smallest stretch, in a complete space**: no
 inverse has to be supplied. If `α = ‖D - 1‖ < 1` and `s > 0` satisfies `s ‖v‖ ≤ ‖D v‖` for all

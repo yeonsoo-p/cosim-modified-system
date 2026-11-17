@@ -59,16 +59,19 @@ section Scalar
 
 variable {K : Type*} [Field K]
 
+/-- For `ξ ≠ -1` and `θ = (2/H) (ξ - 1)/(ξ + 1)`: `1 - (H/2) θ = 2/(ξ + 1)`. -/
+theorem one_sub_cayley_inv [NeZero (2 : K)] {H xi : K} (hH : H ≠ 0) (hxi : xi ≠ -1) :
+    1 - H / 2 * (2 / H * (xi - 1) / (xi + 1)) = 2 / (xi + 1) := by
+  have h1 : xi + 1 ≠ 0 := fun h => hxi (eq_neg_of_add_eq_zero_left h)
+  have h2 : (2 : K) ≠ 0 := NeZero.ne 2
+  field_simp
+  ring
+
 /-- For `ξ ≠ -1` and `θ = (2/H) (ξ - 1)/(ξ + 1)`: `1 - (H/2) θ = 2/(ξ + 1)` is not zero. -/
 theorem cayley_inv_den_ne_zero [NeZero (2 : K)] {H xi : K} (hH : H ≠ 0) (hxi : xi ≠ -1) :
     1 - H / 2 * (2 / H * (xi - 1) / (xi + 1)) ≠ 0 := by
-  have h1 : xi + 1 ≠ 0 := fun h => hxi (eq_neg_of_add_eq_zero_left h)
-  have h2 : (2 : K) ≠ 0 := NeZero.ne 2
-  have e : 1 - H / 2 * (2 / H * (xi - 1) / (xi + 1)) = 2 / (xi + 1) := by
-    field_simp
-    ring
-  rw [e]
-  exact div_ne_zero h2 h1
+  rw [one_sub_cayley_inv hH hxi]
+  exact div_ne_zero (NeZero.ne 2) fun h => hxi (eq_neg_of_add_eq_zero_left h)
 
 /-- **The two scalar maps are inverse to each other, first half:** for `ξ ≠ -1` and
 `θ = (2/H) (ξ - 1)/(ξ + 1)`, `(1 + (H/2) θ)/(1 - (H/2) θ) = ξ`. -/
@@ -77,13 +80,10 @@ theorem cayley_cayley_inv [NeZero (2 : K)] {H xi : K} (hH : H ≠ 0) (hxi : xi �
       xi := by
   have h1 : xi + 1 ≠ 0 := fun h => hxi (eq_neg_of_add_eq_zero_left h)
   have h2 : (2 : K) ≠ 0 := NeZero.ne 2
-  have e1 : 1 - H / 2 * (2 / H * (xi - 1) / (xi + 1)) = 2 / (xi + 1) := by
-    field_simp
-    ring
   have e2 : 1 + H / 2 * (2 / H * (xi - 1) / (xi + 1)) = 2 * xi / (xi + 1) := by
     field_simp
     ring
-  rw [e1, e2]
+  rw [one_sub_cayley_inv hH hxi, e2]
   field_simp
 
 /-- For `1 - (H/2) θ ≠ 0` the Cayley transform `ξ = (1 + (H/2) θ)/(1 - (H/2) θ)` is not `-1`. -/
@@ -129,12 +129,15 @@ theorem cayley_inv_re (H : ℝ) (xi : ℂ) :
     Complex.one_im, sub_zero, add_zero, Complex.normSq_apply]
   ring
 
+/-- `|ξ + 1|² > 0` for a complex `ξ ≠ -1`. -/
+theorem normSq_add_one_pos {xi : ℂ} (hxi : xi ≠ -1) : 0 < Complex.normSq (xi + 1) :=
+  Complex.normSq_pos.2 fun h => hxi (eq_neg_of_add_eq_zero_left h)
+
 /-- **The unit disc and the left half plane:** for a real `H > 0`, a complex `ξ ≠ -1` and
 `θ = (2/H) (ξ - 1)/(ξ + 1)`: `|ξ| < 1` if and only if `Re θ < 0`. -/
 theorem norm_lt_one_iff_cayley_re_neg {H : ℝ} (hH : 0 < H) {xi : ℂ} (hxi : xi ≠ -1) :
     ‖xi‖ < 1 ↔ (2 / (H : ℂ) * (xi - 1) / (xi + 1)).re < 0 := by
-  have hd : 0 < Complex.normSq (xi + 1) :=
-    Complex.normSq_pos.2 fun h => hxi (eq_neg_of_add_eq_zero_left h)
+  have hd := normSq_add_one_pos hxi
   have hc : 0 < 2 / H := div_pos two_pos hH
   rw [cayley_inv_re, ← sq_lt_one_iff₀ (norm_nonneg xi), ← Complex.normSq_eq_norm_sq]
   constructor
@@ -148,8 +151,7 @@ theorem norm_lt_one_iff_cayley_re_neg {H : ℝ} (hH : 0 < H) {xi : ℂ} (hxi : x
 `θ = (2/H) (ξ - 1)/(ξ + 1)`: `|ξ| = 1` if and only if `Re θ = 0`. -/
 theorem norm_eq_one_iff_cayley_re_eq_zero {H : ℝ} (hH : 0 < H) {xi : ℂ} (hxi : xi ≠ -1) :
     ‖xi‖ = 1 ↔ (2 / (H : ℂ) * (xi - 1) / (xi + 1)).re = 0 := by
-  have hd : 0 < Complex.normSq (xi + 1) :=
-    Complex.normSq_pos.2 fun h => hxi (eq_neg_of_add_eq_zero_left h)
+  have hd := normSq_add_one_pos hxi
   have hc : 0 < 2 / H := div_pos two_pos hH
   rw [cayley_inv_re, ← pow_eq_one_iff_of_nonneg (norm_nonneg xi) two_ne_zero,
     ← Complex.normSq_eq_norm_sq]
@@ -362,6 +364,25 @@ theorem spectrum_iff {E A X : Matrix ι ι ℂ} {H : ℝ} (hH : 0 < H)
     · exact (norm_lt_one_iff_cayley_re_neg hH hxi).2
         (h _ v hv0 (pencil_of_eigen hmid hHc hxi hv))
 
+/-- **The pencil and the matrix `E⁻¹ A`, complex eigenvalues of real matrices.** For real
+matrices with `det E ≠ 0`: every eigenvalue `θ` of the pencil (`A v = θ E v` with a complex
+`v ≠ 0`) has a negative real part if and only if every complex eigenvalue of `E⁻¹ A` has. -/
+theorem pencil_re_neg_iff_inv {E A : Matrix ι ι ℝ} (hE : E.det ≠ 0) :
+    (∀ (theta : ℂ) (v : ι → ℂ), v ≠ 0 →
+        A.map (algebraMap ℝ ℂ) *ᵥ v = theta • (E.map (algebraMap ℝ ℂ) *ᵥ v) → theta.re < 0) ↔
+      ∀ (theta : ℂ) (v : ι → ℂ), v ≠ 0 →
+        (E⁻¹ * A).map (algebraMap ℝ ℂ) *ᵥ v = theta • v → theta.re < 0 := by
+  have hi : (E⁻¹).map (algebraMap ℝ ℂ) * E.map (algebraMap ℝ ℂ) = 1 := by
+    have h := congrArg (algebraMap ℝ ℂ).mapMatrix
+      (Matrix.nonsing_inv_mul E (isUnit_iff_ne_zero.2 hE))
+    rwa [map_mul, map_one] at h
+  have hm : (E⁻¹ * A).map (algebraMap ℝ ℂ) =
+      (E⁻¹).map (algebraMap ℝ ℂ) * A.map (algebraMap ℝ ℂ) :=
+    map_mul (algebraMap ℝ ℂ).mapMatrix _ _
+  rw [hm]
+  exact forall_congr' fun theta => forall_congr' fun v => imp_congr_right fun _ =>
+    imp_congr_left (pencil_iff_of_left_inv hi)
+
 end Spectrum
 
 end MidpointStability
@@ -545,18 +566,7 @@ theorem zoh_spectrum_iff_inv (A : Matrix (Fin n) (Fin n) ℝ)
         ∀ (theta : ℂ) (v : Fin n → ℂ), v ≠ 0 →
           ((S.midpointE A H)⁻¹ * A).map (algebraMap ℝ ℂ) *ᵥ v = theta • v → theta.re < 0 := by
   rw [S.zoh_spectrum_iff A hA hH hφ, isUnit_iff_ne_zero]
-  refine and_congr_right fun hE => ?_
-  have hi : ((S.midpointE A H)⁻¹).map (algebraMap ℝ ℂ) * (S.midpointE A H).map (algebraMap ℝ ℂ) =
-      1 := by
-    have h := congrArg (algebraMap ℝ ℂ).mapMatrix
-      (Matrix.nonsing_inv_mul (S.midpointE A H) (isUnit_iff_ne_zero.2 hE))
-    rwa [map_mul, map_one] at h
-  have hm : ((S.midpointE A H)⁻¹ * A).map (algebraMap ℝ ℂ) =
-      ((S.midpointE A H)⁻¹).map (algebraMap ℝ ℂ) * A.map (algebraMap ℝ ℂ) :=
-    map_mul (algebraMap ℝ ℂ).mapMatrix _ _
-  rw [hm]
-  exact forall_congr' fun theta => forall_congr' fun v => imp_congr_right fun _ =>
-    imp_congr_left (pencil_iff_of_left_inv hi)
+  exact and_congr_right fun hE => pencil_re_neg_iff_inv hE
 
 end HeldScheme
 

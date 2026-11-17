@@ -51,6 +51,7 @@ import CoSimFoundations.ForcedBlock
 import CoSimFoundations.PairLaws
 import CoSimFoundations.PairTradeOff
 import CoSimFoundations.TripleLaw
+import CoSimFoundations.TripleLawGeneral
 
 open Matrix
 open scoped RealInnerProductSpace
@@ -60,14 +61,6 @@ namespace CoSimFoundations
 namespace OneStep
 
 variable {n : ℕ}
-
-/-- `⟪y, T x⟫ = ⟪x, Tᵀ y⟫`. -/
-theorem inner_opE_transpose (T : Matrix (Fin n) (Fin n) ℝ) (x y : EuclideanSpace ℝ (Fin n)) :
-    ⟪y, opE T x⟫ = ⟪x, opE Tᵀ y⟫ := by
-  rw [inner_opE_eq_sum, inner_opE_eq_sum, Finset.sum_comm]
-  refine Finset.sum_congr rfl fun p _ => Finset.sum_congr rfl fun q _ => ?_
-  rw [Matrix.transpose_apply]
-  ring
 
 /-- `⟪x, (T + T') y⟫ = ⟪x, T y⟫ + ⟪x, T' y⟫`. -/
 theorem inner_opE_add (T T' : Matrix (Fin n) (Fin n) ℝ) (x y : EuclideanSpace ℝ (Fin n)) :
@@ -202,6 +195,44 @@ theorem abs_inner_step_sub_difference_le {At A : Matrix (Fin n) (Fin n) ℝ} {H 
   rw [← e]
   exact (abs_inner_opE_le _ x y).trans (mul_le_mul_of_nonneg_right hn (by positivity))
 
+/-- A sum `Σ_r c_r A p r A r q` in which only the state `k` has `A p k A k q ≠ 0` is its term at
+`k`. -/
+theorem sum_mul_mul_eq_single {A : Matrix (Fin n) (Fin n) ℝ} {p q k : Fin n}
+    (honly : ∀ r, r ≠ k → A p r * A r q = 0) (c : Fin n → ℝ) :
+    ∑ r, c r * A p r * A r q = c k * A p k * A k q :=
+  Finset.sum_eq_single k (fun r _ hr => by rw [mul_assoc, honly r hr, mul_zero])
+    (fun hk => absurd (Finset.mem_univ k) hk)
+
+/-- If `|v - c w| ≤ ρ` with `c ≥ 0`, then `c |w| - ρ ≤ |v|`. -/
+theorem mul_abs_sub_le_abs {c v w ρ : ℝ} (hc : 0 ≤ c) (h : |v - c * w| ≤ ρ) :
+    c * |w| - ρ ≤ |v| := by
+  have h1 := abs_sub_abs_le_abs_sub (c * w) v
+  rw [abs_sub_comm, abs_mul, abs_of_nonneg hc] at h1
+  linarith
+
+/-- **From the one-step error to the difference of the generators, a sum of two entries.** If
+`|e₁ + e₂ - ½H² σ| ≤ B`, `|e₁ - H d₁| ≤ R` and `|e₂ - H d₂| ≤ R` with `H > 0`, then
+`|d₁ + d₂ - ½H σ| ≤ ρ` for the `ρ` with `B + 2 R = H ρ`. -/
+theorem abs_add_sub_half_mul_le {H e₁ e₂ d₁ d₂ σ B R ρ : ℝ} (hH : 0 < H)
+    (h1 : |e₁ + e₂ - H ^ 2 / 2 * σ| ≤ B) (h2 : |e₁ - H * d₁| ≤ R) (h3 : |e₂ - H * d₂| ≤ R)
+    (hρ : B + 2 * R = H * ρ) : |d₁ + d₂ - H / 2 * σ| ≤ ρ := by
+  rw [abs_le] at h1 h2 h3
+  refine le_of_mul_le_mul_left ?_ hH
+  rw [← hρ, ← abs_of_pos hH, ← abs_mul, abs_of_pos hH, abs_le]
+  constructor <;> nlinarith [h1.1, h1.2, h2.1, h2.2, h3.1, h3.2]
+
+/-- **From the one-step error to the difference of the generators, a difference of two entries**
+(`abs_add_sub_half_mul_le` for `-e₂` and `-d₂`): if `|e₁ - e₂ - ½H² σ| ≤ B`, `|e₁ - H d₁| ≤ R`
+and `|e₂ - H d₂| ≤ R` with `H > 0`, then `|d₁ - d₂ - ½H σ| ≤ ρ` for the `ρ` with
+`B + 2 R = H ρ`. -/
+theorem abs_sub_sub_half_mul_le {H e₁ e₂ d₁ d₂ σ B R ρ : ℝ} (hH : 0 < H)
+    (h1 : |e₁ - e₂ - H ^ 2 / 2 * σ| ≤ B) (h2 : |e₁ - H * d₁| ≤ R) (h3 : |e₂ - H * d₂| ≤ R)
+    (hρ : B + 2 * R = H * ρ) : |d₁ - d₂ - H / 2 * σ| ≤ ρ := by
+  have h3' : |-e₂ - H * -d₂| ≤ R := by rwa [mul_neg, neg_sub_neg, abs_sub_comm]
+  have h := abs_add_sub_half_mul_le hH (e₂ := -e₂) (d₂ := -d₂)
+    (by rwa [← sub_eq_add_neg]) h2 h3' hρ
+  rwa [← sub_eq_add_neg] at h
+
 end OneStep
 
 open OneStep
@@ -240,6 +271,16 @@ theorem sgn_add_entry (S : HeldScheme n κ) (A : Matrix (Fin n) (Fin n) ℝ) (s 
   rw [sgn, sgn, Matrix.diagonal_add, mul_diagonal_mul_apply]
   exact Finset.sum_congr rfl fun r _ => by ring
 
+/-- In Jacobi mode all signs are `-1`, so `A (ς_s + ς_t) A = -2 A²`. -/
+theorem mul_sgn_add_mul_of_jacobi (hJ : ∀ s t, S.stage s = S.stage t)
+    (A : Matrix (Fin n) (Fin n) ℝ) (s t : κ) :
+    A * (S.sgn s + S.sgn t) * A = (-2 : ℝ) • (A * A) := by
+  ext p q
+  rw [S.sgn_add_entry, Matrix.smul_apply, Matrix.mul_apply, smul_eq_mul, Finset.mul_sum]
+  refine Finset.sum_congr rfl fun r _ => ?_
+  rw [sg_of_jacobi hJ, sg_of_jacobi hJ]
+  ring
+
 /-- The entry of `A (ς_s - ς_t) A`. -/
 theorem sgn_sub_entry (S : HeldScheme n κ) (A : Matrix (Fin n) (Fin n) ℝ) (s t : κ)
     (p q : Fin n) : (A * (S.sgn s - S.sgn t) * A) p q =
@@ -263,6 +304,18 @@ theorem Consistent.inner_sgn_swap (h : S.Consistent A U H a b c)
   exact skew_entry h.hA hskew _ (by rw [hp, hq]; exact hst) (by rw [hp, hq]; exact hnp)
     (by rw [hp, hq]; exact hnp')
 
+/-- **The forced block read from `t` to `s`**, with the matrix element of `A ς_t A` and the
+norms written from `s` to `t`: for skew coupling, `x` supported on `s` and `y` on `t`,
+`|⟪y, (X - U) x⟫ - ½H² ⟪x, A ς_t A y⟫| ≤ C H³ ‖x‖ ‖y‖`. -/
+theorem Consistent.forced_block_swap (h : S.Consistent A U H a b c)
+    (hskew : ∀ p q, S.sub p ≠ S.sub q → A q p = -A p q) {s t : κ} (hst : s ≠ t)
+    (hnp : ¬ S.partner s t) (hnp' : ¬ S.partner t s) {x y : EuclideanSpace ℝ (Fin n)}
+    (hx : ∀ p, S.sub p ≠ s → x p = 0) (hy : ∀ q, S.sub q ≠ t → y q = 0) :
+    |⟪y, opE (S.X - U) x⟫ - H ^ 2 / 2 * ⟪x, opE (A * S.sgn t * A) y⟫| ≤
+      forcedC a b c ‖opE A‖ H * H ^ 3 * (‖x‖ * ‖y‖) := by
+  have h2 := h.forced_block hst.symm hnp' hy hx
+  rwa [h.inner_sgn_swap hskew hst hnp hnp' t hx hy, mul_comm ‖y‖ ‖x‖] at h2
+
 /-- **The symmetric combination** (Corollary 5.1, one-step form, numerical dissipation). For a
 consistent scheme with skew coupling, subsystems `s ≠ t` that are not partners, `x` supported on
 `s` and `y` on `t`:
@@ -275,8 +328,7 @@ theorem Consistent.forced_sym (h : S.Consistent A U H a b c)
         H ^ 2 / 2 * ⟪x, opE (A * (S.sgn s + S.sgn t) * A) y⟫| ≤
       2 * forcedC a b c ‖opE A‖ H * H ^ 3 * (‖x‖ * ‖y‖) := by
   have h1 := abs_le.1 (h.forced_block hst hnp hx hy)
-  have h2 := abs_le.1 (h.forced_block hst.symm hnp' hy hx)
-  rw [h.inner_sgn_swap hskew hst hnp hnp' t hx hy, mul_comm ‖y‖ ‖x‖] at h2
+  have h2 := abs_le.1 (h.forced_block_swap hskew hst hnp hnp' hx hy)
   rw [Matrix.mul_add, Matrix.add_mul, inner_opE_add, abs_le]
   constructor <;> linarith [h1.1, h1.2, h2.1, h2.2]
 
@@ -290,8 +342,7 @@ theorem Consistent.forced_antisym (h : S.Consistent A U H a b c)
         H ^ 2 / 2 * ⟪x, opE (A * (S.sgn s - S.sgn t) * A) y⟫| ≤
       2 * forcedC a b c ‖opE A‖ H * H ^ 3 * (‖x‖ * ‖y‖) := by
   have h1 := abs_le.1 (h.forced_block hst hnp hx hy)
-  have h2 := abs_le.1 (h.forced_block hst.symm hnp' hy hx)
-  rw [h.inner_sgn_swap hskew hst hnp hnp' t hx hy, mul_comm ‖y‖ ‖x‖] at h2
+  have h2 := abs_le.1 (h.forced_block_swap hskew hst hnp hnp' hx hy)
   rw [Matrix.mul_sub, Matrix.sub_mul, inner_opE_sub (A * S.sgn s * A), abs_le]
   constructor <;> linarith [h1.1, h1.2, h2.1, h2.2]
 
@@ -334,9 +385,7 @@ theorem Consistent.sym_after_both (h : S.Consistent A U H a b c)
     |(S.X - U) p q + (S.X - U) q p + H ^ 2 * (A p k * A k q)| ≤
       2 * forcedC a b c ‖opE A‖ H * H ^ 3 := by
   have h1 := h.forced_sym_entry hskew hne hnp hnp'
-  rw [Finset.sum_eq_single k (fun r _ hr => by rw [mul_assoc, honly r hr, mul_zero])
-    (fun hk => absurd (Finset.mem_univ k) hk)] at h1
-  simp only [sg, hkp, hkq, ↓reduceIte] at h1
+  rw [sum_mul_mul_eq_single honly, sg, sg, ite_eq_right hkp, ite_eq_right hkq] at h1
   convert h1 using 2
   ring
 
@@ -351,9 +400,7 @@ theorem Consistent.sym_before_both (h : S.Consistent A U H a b c)
     |(S.X - U) p q + (S.X - U) q p - H ^ 2 * (A p k * A k q)| ≤
       2 * forcedC a b c ‖opE A‖ H * H ^ 3 := by
   have h1 := h.forced_sym_entry hskew hne hnp hnp'
-  rw [Finset.sum_eq_single k (fun r _ hr => by rw [mul_assoc, honly r hr, mul_zero])
-    (fun hk => absurd (Finset.mem_univ k) hk)] at h1
-  simp only [sg, hkp, hkq, ↓reduceIte] at h1
+  rw [sum_mul_mul_eq_single honly, sg, sg, ite_eq_left hkp, ite_eq_left hkq] at h1
   convert h1 using 2
   ring
 
@@ -366,15 +413,8 @@ theorem Consistent.sym_between (h : S.Consistent A U H a b c)
     (hk : S.stage (S.sub k) < S.stage (S.sub p) ↔ ¬ S.stage (S.sub k) < S.stage (S.sub q)) :
     |(S.X - U) p q + (S.X - U) q p| ≤ 2 * forcedC a b c ‖opE A‖ H * H ^ 3 := by
   have h1 := h.forced_sym_entry hskew hne hnp hnp'
-  rw [Finset.sum_eq_single k (fun r _ hr => by rw [mul_assoc, honly r hr, mul_zero])
-    (fun hk => absurd (Finset.mem_univ k) hk)] at h1
-  have h0 : S.sg (S.sub p) (S.sub k) + S.sg (S.sub q) (S.sub k) = 0 := by
-    by_cases hkq : S.stage (S.sub k) < S.stage (S.sub q)
-    · have hkp : ¬ S.stage (S.sub k) < S.stage (S.sub p) := fun h' => (hk.1 h') hkq
-      simp [sg, hkp, hkq]
-    · have hkp : S.stage (S.sub k) < S.stage (S.sub p) := hk.2 hkq
-      simp [sg, hkp, hkq]
-  rwa [h0, zero_mul, zero_mul, mul_zero, sub_zero] at h1
+  rwa [sum_mul_mul_eq_single honly, S.sg_add_sg_eq_zero hk, zero_mul, zero_mul, mul_zero,
+    sub_zero] at h1
 
 /-- **A single common partner that runs before `p` and not before `q`**: the antisymmetric
 combination is within `2 C H³` of `H² A p k A k q` (a numerical interconnection `±½H A A` in the
@@ -388,9 +428,7 @@ theorem Consistent.antisym_between (h : S.Consistent A U H a b c)
     |(S.X - U) p q - (S.X - U) q p - H ^ 2 * (A p k * A k q)| ≤
       2 * forcedC a b c ‖opE A‖ H * H ^ 3 := by
   have h1 := h.forced_antisym_entry hskew hne hnp hnp'
-  rw [Finset.sum_eq_single k (fun r _ hr => by rw [mul_assoc, honly r hr, mul_zero])
-    (fun hk => absurd (Finset.mem_univ k) hk)] at h1
-  simp only [sg, hkp, hkq, ↓reduceIte] at h1
+  rw [sum_mul_mul_eq_single honly, sg, sg, ite_eq_left hkp, ite_eq_right hkq] at h1
   convert h1 using 2
   ring
 
@@ -401,6 +439,17 @@ theorem inner_defect_eq {D : Matrix (Fin n) (Fin n) ℝ} (hD : S.X = D * U)
     ⟪x, opE U y - opE D (opE U y)⟫ = -⟪x, opE (S.X - U) y⟫ := by
   rw [inner_opE_sub, hD, opE_mul_apply, inner_sub_right]
   ring
+
+/-- **The gain law of a pair, on the one-step error.** For `X = D U` and unit vectors `x`, `y`
+supported on two different subsystems:
+`|⟪x, (X - U) y⟫ + ⟪y, (X - U) x⟫| ≤ (‖D‖ - 1) + ‖D - 1‖ (1 + ‖U x - x‖ + ‖U y - y‖)`. -/
+theorem abs_inner_step_add_le_pair_gain {D : Matrix (Fin n) (Fin n) ℝ} (hD : S.X = D * U)
+    {s t : κ} (hst : s ≠ t) {x y : EuclideanSpace ℝ (Fin n)} (hx : ∀ p, S.sub p ≠ s → x p = 0)
+    (hy : ∀ q, S.sub q ≠ t → y q = 0) (hx1 : ‖x‖ = 1) (hy1 : ‖y‖ = 1) :
+    |⟪x, opE (S.X - U) y⟫ + ⟪y, opE (S.X - U) x⟫| ≤
+      (‖opE D‖ - 1) + ‖opE D - 1‖ * (1 + (‖opE U x - x‖ + ‖opE U y - y‖)) := by
+  have h2 := pair_gain (opE D) (opE U) hx1 hy1 (inner_eq_zero_of_support hst hx hy)
+  rwa [inner_defect_eq hD, inner_defect_eq hD, ← neg_add, abs_neg] at h2
 
 /-- **What the symmetric part costs** (Proposition 5.4, eq. (pair), for every order of execution;
 one-step counterpart of Corollary 5.3). For a consistent scheme with skew coupling and one-step
@@ -417,16 +466,8 @@ theorem Consistent.pair_gain_forced (h : S.Consistent A U H a b c)
       (‖opE D‖ - 1) + ‖opE D - 1‖ * (1 + (‖opE U x - x‖ + ‖opE U y - y‖)) := by
   have h1 := h.forced_sym hskew hst hnp hnp' hx hy
   rw [hx1, hy1, mul_one, mul_one] at h1
-  have h2 := pair_gain (opE D) (opE U) hx1 hy1 (inner_eq_zero_of_support hst hx hy)
-  rw [inner_defect_eq hD, inner_defect_eq hD, ← neg_add, abs_neg] at h2
-  have h3 : H ^ 2 / 2 * |⟪x, opE (A * (S.sgn s + S.sgn t) * A) y⟫| =
-      |H ^ 2 / 2 * ⟪x, opE (A * (S.sgn s + S.sgn t) * A) y⟫| := by
-    rw [abs_mul, abs_of_nonneg (by positivity : (0 : ℝ) ≤ H ^ 2 / 2)]
-  rw [h3]
-  have h4 := abs_sub_abs_le_abs_sub (H ^ 2 / 2 * ⟪x, opE (A * (S.sgn s + S.sgn t) * A) y⟫)
-    (⟪x, opE (S.X - U) y⟫ + ⟪y, opE (S.X - U) x⟫)
-  rw [abs_sub_comm] at h4
-  linarith
+  exact (mul_abs_sub_le_abs (by positivity) h1).trans
+    (abs_inner_step_add_le_pair_gain hD hst hx hy hx1 hy1)
 
 /-- **What the symmetric part costs, in entries** (for scalar stores `sub = id`), with
 `e_p`, `e_q` the unit vectors of the states `p`, `q`:
@@ -484,13 +525,7 @@ theorem Consistent.pair_tradeoff_forced (h : S.Consistent A U H a b c)
   rw [hx1, hy1, mul_one, mul_one] at h1
   have h2 := pair_tradeoff (opE D) (opE U) hx1 hy1 (inner_eq_zero_of_support hst hx hy) hm0 hmD
   rw [inner_defect_eq hD, inner_defect_eq hD, ← neg_add, abs_neg] at h2
-  have h3 : H ^ 2 / 2 * |⟪x, opE (A * (S.sgn s + S.sgn t) * A) y⟫| =
-      |H ^ 2 / 2 * ⟪x, opE (A * (S.sgn s + S.sgn t) * A) y⟫| := by
-    rw [abs_mul, abs_of_nonneg (by positivity : (0 : ℝ) ≤ H ^ 2 / 2)]
-  rw [h3]
-  have h4 := abs_sub_abs_le_abs_sub (H ^ 2 / 2 * ⟪x, opE (A * (S.sgn s + S.sgn t) * A) y⟫)
-    (⟪x, opE (S.X - U) y⟫ + ⟪y, opE (S.X - U) x⟫)
-  rw [abs_sub_comm] at h4
+  have h3 := mul_abs_sub_le_abs (by positivity) h1
   linarith
 
 /-! ### The difference form: Proposition 4.4, Corollary 5.1 and Corollary 5.3 as stated -/
@@ -534,12 +569,8 @@ theorem Consistent.difference_sym_entry (h : S.Consistent A U H a b c)
     |(At - A) p q + (At - A) q p - H / 2 *
         ∑ r, (S.sg (S.sub p) (S.sub r) + S.sg (S.sub q) (S.sub r)) * A p r * A r q| ≤
       2 * (forcedC a b c ‖opE A‖ H * H ^ 2 + H * ‖opE (At - A)‖ * m * Real.exp (H * m)) := by
-  have h1 := abs_le.1 (h.forced_sym_entry hskew hne hnp hnp')
-  have h2 := abs_le.1 (h.abs_step_entry_sub_le hX hAt hA p q)
-  have h3 := abs_le.1 (h.abs_step_entry_sub_le hX hAt hA q p)
-  refine le_of_mul_le_mul_left ?_ hH
-  rw [← abs_of_pos hH, ← abs_mul, abs_of_pos hH, abs_le]
-  constructor <;> nlinarith [h1.1, h1.2, h2.1, h2.2, h3.1, h3.2]
+  exact abs_add_sub_half_mul_le hH (h.forced_sym_entry hskew hne hnp hnp')
+    (h.abs_step_entry_sub_le hX hAt hA p q) (h.abs_step_entry_sub_le hX hAt hA q p) (by ring)
 
 /-- **The antisymmetric part of the difference** (Corollary 5.1 as stated, numerical
 interconnection `[Δ_J]_pq = ½ (Δ p q - Δ q p)`, with its remainder):
@@ -553,12 +584,8 @@ theorem Consistent.difference_antisym_entry (h : S.Consistent A U H a b c)
     |(At - A) p q - (At - A) q p - H / 2 *
         ∑ r, (S.sg (S.sub p) (S.sub r) - S.sg (S.sub q) (S.sub r)) * A p r * A r q| ≤
       2 * (forcedC a b c ‖opE A‖ H * H ^ 2 + H * ‖opE (At - A)‖ * m * Real.exp (H * m)) := by
-  have h1 := abs_le.1 (h.forced_antisym_entry hskew hne hnp hnp')
-  have h2 := abs_le.1 (h.abs_step_entry_sub_le hX hAt hA p q)
-  have h3 := abs_le.1 (h.abs_step_entry_sub_le hX hAt hA q p)
-  refine le_of_mul_le_mul_left ?_ hH
-  rw [← abs_of_pos hH, ← abs_mul, abs_of_pos hH, abs_le]
-  constructor <;> nlinarith [h1.1, h1.2, h2.1, h2.2, h3.1, h3.2]
+  exact abs_sub_sub_half_mul_le hH (h.forced_antisym_entry hskew hne hnp hnp')
+    (h.abs_step_entry_sub_le hX hAt hA p q) (h.abs_step_entry_sub_le hX hAt hA q p) (by ring)
 
 /-- **The amount** (Corollary 5.3 as stated, with its remainder; coordinate directions). For a
 consistent scheme with skew coupling and a modified system `Ã`, `Δ = Ã - A`, numerical damping
@@ -580,15 +607,7 @@ theorem Consistent.amount (h : S.Consistent A U H a b c)
   have hpq : p ≠ q := fun h' => hne (h' ▸ rfl)
   have h1 := h.difference_sym_entry hskew hX hH hAt hA hne hnp hnp'
   have h2 := triple_law (At - A) hlam hpq
-  have h3 : H / 2 *
-      |∑ r, (S.sg (S.sub p) (S.sub r) + S.sg (S.sub q) (S.sub r)) * A p r * A r q| =
-      |H / 2 * ∑ r, (S.sg (S.sub p) (S.sub r) + S.sg (S.sub q) (S.sub r)) * A p r * A r q| := by
-    rw [abs_mul, abs_of_pos (by positivity : (0 : ℝ) < H / 2)]
-  rw [h3]
-  have h4 := abs_sub_abs_le_abs_sub
-    (H / 2 * ∑ r, (S.sg (S.sub p) (S.sub r) + S.sg (S.sub q) (S.sub r)) * A p r * A r q)
-    ((At - A) p q + (At - A) q p)
-  rw [abs_sub_comm] at h4
+  have h3 := mul_abs_sub_le_abs (div_pos hH two_pos).le h1
   linarith
 
 end Parts

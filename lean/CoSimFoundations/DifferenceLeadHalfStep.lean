@@ -62,6 +62,14 @@ variable {n : ℕ}
 theorem inv_mul_sq_half {H : ℝ} (hH : H ≠ 0) : H⁻¹ * (H ^ 2 / 2) = H / 2 := by
   rw [sq, mul_div_assoc, ← mul_assoc, inv_mul_cancel₀ hH, one_mul]
 
+/-- Dividing a bound of the half-step term by the macro step: if `|p - H²/2 · q| ≤ H C` with
+`H > 0`, then `|H⁻¹ p - H/2 · q| ≤ C`. -/
+theorem abs_inv_mul_sub_half_le {H p q C : ℝ} (hH : 0 < H)
+    (h : |p - H ^ 2 / 2 * q| ≤ H * C) : |H⁻¹ * p - H / 2 * q| ≤ C := by
+  have e : H⁻¹ * p - H / 2 * q = H⁻¹ * (p - H ^ 2 / 2 * q) := by
+    rw [mul_sub, ← mul_assoc, inv_mul_sq_half hH.ne']
+  rwa [e, abs_mul, abs_of_pos (inv_pos.2 hH), inv_mul_le_iff₀ hH]
+
 /-- **The numerical interconnection** `Δ_J = skew Δ`, `Δ = Ã - A`, of a co-simulation with the
 modified system `Ã` of a monolithic system `A` (the paper, Proposition `prop:basis`). -/
 noncomputable def numInterconnection (A At : Matrix (Fin n) (Fin n) ℝ) :
@@ -151,15 +159,10 @@ theorem Consistent.numDissipation_block (h : S.Consistent A U H a b c)
         H / 4 * ⟪x, opE (A * (S.sgn s + S.sgn t) * A) y⟫| ≤
       (diffLeadC b c ‖opE A‖ + forcedC a b c ‖opE A‖ H) * H ^ 2 * (‖x‖ * ‖y‖) := by
   have h1 := abs_le.1 (abs_inner_difference_sub_le hH h.hU h.hb h.hc hbH hAH x y)
-  have h2 := abs_le.1 (abs_inner_difference_sub_le hH h.hU h.hb h.hc hbH hAH y x)
-  rw [mul_comm ‖y‖ ‖x‖] at h2
-  have h3 : |H⁻¹ * (⟪x, opE (S.X - U) y⟫ + ⟪y, opE (S.X - U) x⟫ -
-      H ^ 2 / 2 * ⟪x, opE (A * (S.sgn s + S.sgn t) * A) y⟫)| ≤
-      2 * forcedC a b c ‖opE A‖ H * H ^ 2 * (‖x‖ * ‖y‖) := by
-    rw [abs_mul, abs_of_pos (inv_pos.2 hH), inv_mul_le_iff₀ hH]
-    exact (h.forced_sym hskew hst hnp hnp' hx hy).trans_eq (by ring)
-  rw [mul_sub, mul_add, ← mul_assoc, inv_mul_sq_half hH.ne'] at h3
-  have h4 := abs_le.1 h3
+  have h2 := abs_le.1 (abs_inner_difference_sub_le_swap hH h.hU h.hb h.hc hbH hAH x y)
+  have h4 := abs_le.1 (abs_inv_mul_sub_half_le hH
+    (C := 2 * forcedC a b c ‖opE A‖ H * H ^ 2 * (‖x‖ * ‖y‖))
+    ((h.forced_sym hskew hst hnp hnp' hx hy).trans_eq (by ring)))
   rw [inner_numDissipation, abs_le]
   change -((diffLeadC b c ‖opE A‖ + forcedC a b c ‖opE A‖ H) * H ^ 2 * (‖x‖ * ‖y‖)) ≤
       -(1 / 2) * (⟪x, opE (difference A H S.X) y⟫ + ⟪y, opE (difference A H S.X) x⟫) +
@@ -182,15 +185,10 @@ theorem Consistent.numInterconnection_block (h : S.Consistent A U H a b c)
         H / 4 * ⟪x, opE (A * (S.sgn s - S.sgn t) * A) y⟫| ≤
       (diffLeadC b c ‖opE A‖ + forcedC a b c ‖opE A‖ H) * H ^ 2 * (‖x‖ * ‖y‖) := by
   have h1 := abs_le.1 (abs_inner_difference_sub_le hH h.hU h.hb h.hc hbH hAH x y)
-  have h2 := abs_le.1 (abs_inner_difference_sub_le hH h.hU h.hb h.hc hbH hAH y x)
-  rw [mul_comm ‖y‖ ‖x‖] at h2
-  have h3 : |H⁻¹ * (⟪x, opE (S.X - U) y⟫ - ⟪y, opE (S.X - U) x⟫ -
-      H ^ 2 / 2 * ⟪x, opE (A * (S.sgn s - S.sgn t) * A) y⟫)| ≤
-      2 * forcedC a b c ‖opE A‖ H * H ^ 2 * (‖x‖ * ‖y‖) := by
-    rw [abs_mul, abs_of_pos (inv_pos.2 hH), inv_mul_le_iff₀ hH]
-    exact (h.forced_antisym hskew hst hnp hnp' hx hy).trans_eq (by ring)
-  rw [mul_sub, mul_sub, ← mul_assoc, inv_mul_sq_half hH.ne'] at h3
-  have h4 := abs_le.1 h3
+  have h2 := abs_le.1 (abs_inner_difference_sub_le_swap hH h.hU h.hb h.hc hbH hAH x y)
+  have h4 := abs_le.1 (abs_inv_mul_sub_half_le hH
+    (C := 2 * forcedC a b c ‖opE A‖ H * H ^ 2 * (‖x‖ * ‖y‖))
+    ((h.forced_antisym hskew hst hnp hnp' hx hy).trans_eq (by ring)))
   rw [inner_numInterconnection, abs_le]
   change -((diffLeadC b c ‖opE A‖ + forcedC a b c ‖opE A‖ H) * H ^ 2 * (‖x‖ * ‖y‖)) ≤
       1 / 2 * (⟪x, opE (difference A H S.X) y⟫ - ⟪y, opE (difference A H S.X) x⟫) -
@@ -291,13 +289,9 @@ theorem Consistent.difference_forced (h : S.Consistent A U H a b c) (hH : 0 < H)
     |⟪x, opE (difference A H S.X) y⟫ - H / 2 * ⟪x, opE (S.signedCoupling A * A) y⟫| ≤
       (diffLeadC b c ‖opE A‖ + reactionC a b c ‖opE A‖ H) * H ^ 2 * (‖x‖ * ‖y‖) := by
   have h1 := abs_le.1 (abs_inner_difference_sub_le hH h.hU h.hb h.hc hbH hAH x y)
-  have h3 : |H⁻¹ * (⟪x, opE (S.X - U) y⟫ -
-      H ^ 2 / 2 * ⟪x, opE (S.signedCoupling A * A) y⟫)| ≤
-      reactionC a b c ‖opE A‖ H * H ^ 2 * (‖x‖ * ‖y‖) := by
-    rw [abs_mul, abs_of_pos (inv_pos.2 hH), inv_mul_le_iff₀ hH]
-    exact (h.half_step_forced hst hnp hx hy).trans_eq (by ring)
-  rw [mul_sub, ← mul_assoc, inv_mul_sq_half hH.ne'] at h3
-  have h4 := abs_le.1 h3
+  have h4 := abs_le.1 (abs_inv_mul_sub_half_le hH
+    (C := reactionC a b c ‖opE A‖ H * H ^ 2 * (‖x‖ * ‖y‖))
+    ((h.half_step_forced hst hnp hx hy).trans_eq (by ring)))
   rw [abs_le]
   constructor <;> linarith [h1.1, h1.2, h4.1, h4.2]
 
@@ -314,15 +308,9 @@ theorem Consistent.abs_numDamping_half_step_le (h : S.Consistent A U H a b c)
         H / 2 * Matrix.trace (S.signedCoupling A * A)| ≤
       (n : ℝ) * (diffLeadC b c ‖opE A‖ + reactionC a b c ‖opE A‖ H) * H ^ 2 := by
   have h1 := abs_le.1 (abs_numDamping_add_trace_le hH h.hU h.hb h.hc hbH hAH)
-  have h3 : |H⁻¹ * (Matrix.trace (S.X - U) -
-      Matrix.trace (S.F - 1 - H • S.blockDiag A -
-        (H ^ 2 / 2) • (S.blockDiag A * S.blockDiag A)) -
-      H ^ 2 / 2 * Matrix.trace (S.signedCoupling A * A))| ≤
-      (n : ℝ) * reactionC a b c ‖opE A‖ H * H ^ 2 := by
-    rw [abs_mul, abs_of_pos (inv_pos.2 hH), inv_mul_le_iff₀ hH]
-    exact (h.half_step_trace hself).trans_eq (by ring)
-  rw [mul_sub, mul_sub, ← mul_assoc, inv_mul_sq_half hH.ne'] at h3
-  have h4 := abs_le.1 h3
+  have h4 := abs_le.1 (abs_inv_mul_sub_half_le hH
+    (C := (n : ℝ) * reactionC a b c ‖opE A‖ H * H ^ 2)
+    ((h.half_step_trace hself).trans_eq (by ring)))
   rw [abs_le]
   constructor <;> linarith [h1.1, h1.2, h4.1, h4.2]
 
@@ -339,14 +327,10 @@ theorem Consistent.abs_numDamping_partner_weights_le (h : S.Consistent A U H a b
       (n : ℝ) * (diffLeadC b c ‖opE A‖ + reactionC a b c ‖opE A‖ H +
         ‖opE (S.blockDiag A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blockDiag A)‖)) * H ^ 2 := by
   have h1 := abs_le.1 (abs_numDamping_add_trace_le hH h.hU h.hb h.hc hbH hAH)
-  have h3 : |H⁻¹ * (Matrix.trace (S.X - U) -
-      H ^ 2 / 2 * Matrix.trace (S.signedCoupling A * A))| ≤
-      (n : ℝ) * (reactionC a b c ‖opE A‖ H +
-        ‖opE (S.blockDiag A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blockDiag A)‖)) * H ^ 2 := by
-    rw [abs_mul, abs_of_pos (inv_pos.2 hH), inv_mul_le_iff₀ hH]
-    exact (h.trace_partner_weights hself hF).trans_eq (by ring)
-  rw [mul_sub, ← mul_assoc, inv_mul_sq_half hH.ne'] at h3
-  have h4 := abs_le.1 h3
+  have h4 := abs_le.1 (abs_inv_mul_sub_half_le hH
+    (C := (n : ℝ) * (reactionC a b c ‖opE A‖ H +
+      ‖opE (S.blockDiag A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blockDiag A)‖)) * H ^ 2)
+    ((h.trace_partner_weights hself hF).trans_eq (by ring)))
   rw [abs_le]
   constructor <;> linarith [h1.1, h1.2, h4.1, h4.2]
 

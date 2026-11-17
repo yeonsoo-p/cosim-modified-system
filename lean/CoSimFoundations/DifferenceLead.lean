@@ -366,6 +366,17 @@ theorem abs_inner_difference_sub_le (hH : 0 < H) (hU : U = exp (H • A))
   exact h1.trans (mul_le_mul_of_nonneg_right (norm_opE_difference_sub_le hH hU hb hc hbH hAH)
     (by positivity))
 
+/-- **The passage for a matrix element, read from `y` to `x`:**
+`|⟪y, Δ x⟫ - H⁻¹ ⟪y, (X - U) x⟫| ≤ K H² ‖x‖ ‖y‖`, the bound of `abs_inner_difference_sub_le`
+with the norms in the order of `x`, `y`. -/
+theorem abs_inner_difference_sub_le_swap (hH : 0 < H) (hU : U = exp (H • A))
+    (hb : ‖opE (X - 1)‖ ≤ b * H) (hc : ‖opE (X - U)‖ ≤ c * H ^ 2) (hbH : b * H ≤ 1 / 3)
+    (hAH : H * ‖opE A‖ ≤ 1 / 4) (x y : EuclideanSpace ℝ (Fin n)) :
+    |⟪y, opE (difference A H X) x⟫ - H⁻¹ * ⟪y, opE (X - U) x⟫| ≤
+      diffLeadC b c ‖opE A‖ * H ^ 2 * (‖x‖ * ‖y‖) := by
+  rw [mul_comm ‖x‖ ‖y‖]
+  exact abs_inner_difference_sub_le hH hU hb hc hbH hAH y x
+
 /-- **The passage for the total numerical damping:** `|ν + H⁻¹ tr (X - U)| ≤ n K H²` under the
 hypotheses of `norm_opE_smul_difference_sub_le`, `n` the number of states. -/
 theorem abs_numDamping_add_trace_le (hH : 0 < H) (hU : U = exp (H • A))

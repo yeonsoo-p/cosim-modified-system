@@ -135,19 +135,6 @@ theorem sg_eq_sg_of_iff {i j k : κ} (h : S.stage k < S.stage i ↔ S.stage k < 
   · rw [ite_eq_left hi, ite_eq_left (h.1 hi)]
   · rw [ite_eq_right hi, ite_eq_right fun hj => hi (h.2 hj)]
 
-/-- If `k` runs before exactly one of `i` and `j` (it runs between them), the two signs towards
-`k` are opposite: `ς_{jk} = -ς_{ik}`. -/
-theorem sg_eq_neg_sg_of_not_iff {i j k : κ}
-    (h : ¬ (S.stage k < S.stage i ↔ S.stage k < S.stage j)) : S.sg j k = -S.sg i k := by
-  unfold sg
-  by_cases hi : S.stage k < S.stage i
-  · have hj : ¬ S.stage k < S.stage j := fun hj => h ⟨fun _ => hj, fun _ => hi⟩
-    rw [ite_eq_left hi, ite_eq_right hj]
-  · have hj : S.stage k < S.stage j := by
-      by_contra hj
-      exact h ⟨fun e => absurd e hi, fun e => absurd e hj⟩
-    rw [ite_eq_right hi, ite_eq_left hj, neg_neg]
-
 end Kind
 
 section Leg
@@ -273,20 +260,10 @@ theorem inner_leg_rule {A : Matrix (Fin n) (Fin n) ℝ} {i j k : κ} {ε₁ ε�
     (hy : ∀ q, S.sub q ≠ j → y q = 0) :
     ⟪y, opE (S.signedCoupling A * A) x⟫ =
       ε₁ * ε₂ * (S.sg j k * S.sg i k) * ⟪x, opE (S.signedCoupling A * A) y⟫ := by
-  rw [inner_opE_eq_sum, inner_opE_eq_sum]
-  conv_lhs => rw [Finset.sum_comm]
-  rw [Finset.mul_sum]
-  refine Finset.sum_congr rfl fun p _ => ?_
-  rw [Finset.mul_sum]
-  refine Finset.sum_congr rfl fun q _ => ?_
-  by_cases hp : S.sub p = i
-  · by_cases hq : S.sub q = j
-    · rw [S.leg_rule hki hkj h₁ h₂ hp hq (fun r => hpq p q r hp hq) fun r => hqp p q r hp hq]
-      ring
-    · rw [hy q hq]
-      ring
-  · rw [hx p hp]
-    ring
+  rw [← OneStep.inner_opE_smul, OneStep.inner_opE_transpose (S.signedCoupling A * A) x y]
+  refine inner_opE_congr hx hy fun p q hp hq => ?_
+  rw [Matrix.transpose_apply, Matrix.smul_apply, smul_eq_mul]
+  exact S.leg_rule hki hkj h₁ h₂ hp hq (fun r => hpq p q r hp hq) fun r => hqp p q r hp hq
 
 /-! ### Several common partners -/
 
@@ -298,6 +275,15 @@ theorem mul_mask_mul_apply (A : Matrix (Fin n) (Fin n) ℝ) (k : κ) (p q : Fin 
   by_cases hr : S.sub r = k
   · rw [ite_eq_left hr, ite_eq_left hr, mul_one]
   · rw [ite_eq_right hr, ite_eq_right hr, mul_zero, zero_mul]
+
+/-- The leg through `k` from `p` to `q` vanishes if `A p r = 0` for the states `r` of `k`. -/
+theorem mul_mask_mul_apply_eq_zero {A : Matrix (Fin n) (Fin n) ℝ} {k : κ} {p : Fin n}
+    (h : ∀ r, S.sub r = k → A p r = 0) (q : Fin n) : (A * S.mask k * A) p q = 0 := by
+  rw [S.mul_mask_mul_apply]
+  refine Finset.sum_eq_zero fun r _ => ?_
+  by_cases hr : S.sub r = k
+  · rw [ite_eq_left hr, h r hr, zero_mul]
+  · rw [ite_eq_right hr]
 
 /-- **A leg in the two directions.** If the link `i`-`k` has the kind `ε₁` and the link `k`-`j`
 the kind `ε₂`, then for `p` in `i` and `q` in `j` the leg through `k` from `q` to `p` is `ε₁ ε₂`
@@ -353,13 +339,8 @@ theorem signedCoupling_mul_apply_partners [Fintype κ] {A : Matrix (Fin n) (Fin 
   by_cases hki : k = i
   · rw [ite_eq_left hki, ite_eq_left (Or.inl hki)]
   · by_cases hkj : k = j
-    · have z : (A * S.mask k * A) p q = 0 := by
-        rw [S.mul_mask_mul_apply]
-        refine Finset.sum_eq_zero fun r _ => ?_
-        by_cases hr : S.sub r = k
-        · rw [ite_eq_left hr, hij p r hp (hr.trans hkj), zero_mul]
-        · rw [ite_eq_right hr]
-      rw [ite_eq_right hki, ite_eq_left (Or.inr hkj), z, mul_zero]
+    · rw [ite_eq_right hki, ite_eq_left (Or.inr hkj),
+        S.mul_mask_mul_apply_eq_zero (fun r hr => hij p r hp (hr.trans hkj)) q, mul_zero]
     · rw [ite_eq_right hki, ite_eq_right (not_or.2 ⟨hki, hkj⟩)]
 
 /-- **The leg rule with several common partners.** Let the block of `A` from `i` to `j` vanish
@@ -381,13 +362,8 @@ theorem leg_rule_sum [Fintype κ] {A : Matrix (Fin n) (Fin n) ℝ} {i j : κ} (�
   by_cases hkj : k = j
   · rw [ite_eq_left hkj, ite_eq_left (Or.inr hkj)]
   · by_cases hki : k = i
-    · have z : (A * S.mask k * A) q p = 0 := by
-        rw [S.mul_mask_mul_apply]
-        refine Finset.sum_eq_zero fun r _ => ?_
-        by_cases hr : S.sub r = k
-        · rw [ite_eq_left hr, hji q r hq (hr.trans hki), zero_mul]
-        · rw [ite_eq_right hr]
-      rw [ite_eq_right hkj, ite_eq_left (Or.inl hki), z, mul_zero]
+    · rw [ite_eq_right hkj, ite_eq_left (Or.inl hki),
+        S.mul_mask_mul_apply_eq_zero (fun r hr => hji q r hq (hr.trans hki)) p, mul_zero]
     · rw [ite_eq_right hkj, ite_eq_right (not_or.2 ⟨hki, hkj⟩),
         S.leg_swap (hkind k hki hkj).1 (hkind k hki hkj).2 hp hq]
       ring
@@ -422,11 +398,9 @@ theorem signedCoupling_mul_apply_kind {A : Matrix (Fin n) (Fin n) ℝ} {i : κ} 
     (S.signedCoupling A * A) p q =
       ∑ r, if S.sub r = i then 0 else ε (S.sub r) * S.sg i (S.sub r) * (A p r * A q r) := by
   rw [S.signedCoupling_mul_apply, hp]
-  refine Finset.sum_congr rfl fun r _ => ?_
-  by_cases hr : S.sub r = i
-  · rw [ite_eq_left hr, ite_eq_left hr]
-  · rw [ite_eq_right hr, ite_eq_right hr, (hkind _ hr).1 q r hq rfl]
-    ring
+  refine Finset.sum_congr rfl fun r _ => if_ctx_congr Iff.rfl (fun _ => rfl) fun hr => ?_
+  rw [(hkind _ hr).1 q r hq rfl]
+  ring
 
 /-- **The reaction for links with a kind, as a bilinear form.** If every link `i`-`k` has a kind
 `ε k`, then for `x`, `y` supported on `i`:
@@ -438,19 +412,17 @@ theorem inner_signedCoupling_mul_kind {A : Matrix (Fin n) (Fin n) ℝ} {i : κ} 
       ∑ r, if S.sub r = i then 0 else
         ε (S.sub r) * S.sg i (S.sub r) * ((∑ p, A p r * x p) * ∑ q, A q r * y q) := by
   rw [S.inner_signedCoupling_mul_row A hx y]
-  refine Finset.sum_congr rfl fun r _ => ?_
-  by_cases hr : S.sub r = i
-  · rw [ite_eq_left hr, ite_eq_left hr]
-  · have e : ∑ q, A r q * y q = ε (S.sub r) * ∑ q, A q r * y q := by
-      rw [Finset.mul_sum]
-      refine Finset.sum_congr rfl fun q _ => ?_
-      by_cases hq : S.sub q = i
-      · rw [(hkind _ hr).1 q r hq rfl]
-        ring
-      · rw [hy q hq]
-        ring
-    rw [ite_eq_right hr, ite_eq_right hr, e]
-    ring
+  refine Finset.sum_congr rfl fun r _ => if_ctx_congr Iff.rfl (fun _ => rfl) fun hr => ?_
+  have e : ∑ q, A r q * y q = ε (S.sub r) * ∑ q, A q r * y q := by
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl fun q _ => ?_
+    by_cases hq : S.sub q = i
+    · rw [(hkind _ hr).1 q r hq rfl]
+      ring
+    · rw [hy q hq]
+      ring
+  rw [e]
+  ring
 
 /-- **The sign of the reaction.** If every link `i`-`k` has a kind `ε k`, then for `x` supported
 on `i`: `⟪x, A_ς A x⟫ = Σ_{r ∉ i} ε(sub r) ς(i, sub r) (Σ_p A p r x p)²`. Each state `r` of a
@@ -492,21 +464,6 @@ theorem inner_signedCoupling_mul_self_dissipative {A : Matrix (Fin n) (Fin n) �
   rw [one_mul]
 
 /-! ### The trace of the relation -/
-
-/-- `|tr T| ≤ n K` for an `n × n` matrix whose diagonal entries are at most `K` in modulus. -/
-theorem abs_trace_le_of_diag {T : Matrix (Fin n) (Fin n) ℝ} {K : ℝ} (h : ∀ p, |T p p| ≤ K) :
-    |Matrix.trace T| ≤ (n : ℝ) * K := by
-  rw [Matrix.trace]
-  refine (Finset.abs_sum_le_sum_abs _ _).trans ?_
-  have h1 : ∑ p, |Matrix.diag T p| ≤ ∑ _p : Fin n, K := Finset.sum_le_sum fun p _ => h p
-  refine h1.trans_eq ?_
-  rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul]
-
-/-- `|tr T| ≤ n ‖T‖` for an `n × n` matrix and the spectral norm. -/
-theorem abs_trace_le (T : Matrix (Fin n) (Fin n) ℝ) : |Matrix.trace T| ≤ (n : ℝ) * ‖opE T‖ := by
-  refine abs_trace_le_of_diag fun p => ?_
-  have h2 := abs_inner_opE_le T (unitE p) (unitE p)
-  rwa [inner_unitE_opE, norm_unitE, mul_one, mul_one] at h2
 
 /-- **The diagonal of the bracket of the partner samples** is the diagonal of `M`: `N`, `A_c` and
 `A₀ A_c` have no diagonal entries. -/
@@ -609,7 +566,7 @@ theorem Consistent.trace_partner_weights {A U : Matrix (Fin n) (Fin n) ℝ} {H a
       (n : ℝ) * (reactionC a b c ‖opE A‖ H +
         ‖opE (S.blockDiag A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blockDiag A)‖)) * H ^ 3 := by
   have h1 := h.half_step_trace hself
-  have h2 := (abs_trace_le (S.F - 1 - H • S.blockDiag A -
+  have h2 := (OneStep.abs_trace_le (S.F - 1 - H • S.blockDiag A -
       (H ^ 2 / 2) • (S.blockDiag A * S.blockDiag A))).trans
     (mul_le_mul_of_nonneg_left (S.norm_local_bracket_le A h.hH hF) (Nat.cast_nonneg n))
   have e : Matrix.trace (S.X - U) - H ^ 2 / 2 * Matrix.trace (S.signedCoupling A * A) =

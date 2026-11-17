@@ -63,6 +63,12 @@ theorem expTail_mul_le (b : ℕ) {x y : ℝ} (hy : 0 ≤ y) (hx0 : 0 ≤ x) (hx1
       = x ^ (n + b) * (y ^ (n + b) / ((n + b)! : ℝ)) := by rw [mul_pow]; ring
     _ ≤ x ^ b * (y ^ (n + b) / ((n + b)! : ℝ)) := mul_le_mul_of_nonneg_right h1 h2
 
+/-- The tail against its value at one: `expTail b x ≤ expTail b 1 · xᵇ` for `0 ≤ x ≤ 1`. -/
+theorem expTail_le_mul_pow (b : ℕ) {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1) :
+    expTail b x ≤ expTail b 1 * x ^ b := by
+  have h := expTail_mul_le b zero_le_one hx0 hx1
+  rwa [one_mul, mul_comm] at h
+
 /-- `expTail 2 1 = e - 2`. -/
 theorem expTail_two_one : expTail 2 1 = Real.exp 1 - 2 := by
   simp [expTail, sum_range_succ, Nat.factorial]
@@ -86,9 +92,7 @@ variable {𝔸 : Type*} [NormedRing 𝔸] [NormedAlgebra ℝ 𝔸] [CompleteSpac
 `‖exp Z - Σ_{n<b} Zⁿ/n!‖ ≤ Σ_{p≥b} ‖Z‖ᵖ/p!` for `b ≥ 1`. -/
 theorem norm_exp_sub_sum_le_expTail (Z : 𝔸) {b : ℕ} (hb : 0 < b) :
     ‖exp Z - ∑ n ∈ range b, ((n ! : ℝ)⁻¹) • Z ^ n‖ ≤ expTail b ‖Z‖ := by
-  have hf : HasSum (fun n : ℕ => ((n ! : ℝ)⁻¹) • Z ^ n) (exp Z) :=
-    exp_series_hasSum_exp' (𝕂 := ℝ) Z
-  have htail := (hasSum_nat_add_iff' b).2 hf
+  have htail := (hasSum_nat_add_iff' b).2 (exp_series_hasSum_exp' (𝕂 := ℝ) Z)
   refine htail.norm_le_of_bounded (hasSum_expTail b ‖Z‖) (fun i => ?_)
   rw [norm_smul, norm_inv, Real.norm_natCast, div_eq_inv_mul]
   exact mul_le_mul_of_nonneg_left (norm_pow_le' Z (by omega)) (inv_nonneg.2 (Nat.cast_nonneg _))
@@ -163,6 +167,30 @@ theorem ascPochhammer_eval_eq_prod_range (l : ℕ) (s : ℝ) :
   | zero => simp
   | succ l ih => rw [ascPochhammer_succ_eval, ih, prod_range_succ]
 
+/-- The integral of a polynomial over `[0, 1]`:
+`∫₀¹ Σ_{m ∈ s} c_m xᵐ dx = Σ_{m ∈ s} c_m / (m + 1)`. -/
+theorem integral_sum_mul_pow (s : Finset ℕ) (c : ℕ → ℝ) :
+    ∫ x in (0 : ℝ)..1, ∑ m ∈ s, c m * x ^ m = ∑ m ∈ s, c m / ((m : ℝ) + 1) := by
+  have hint : ∀ m ∈ s,
+      IntervalIntegrable (fun x : ℝ => c m * x ^ m) MeasureTheory.volume 0 1 :=
+    fun m _ => (continuous_const.mul (continuous_pow m)).intervalIntegrable _ _
+  rw [intervalIntegral.integral_finsetSum hint]
+  refine sum_congr rfl fun m _ => ?_
+  rw [intervalIntegral.integral_const_mul, integral_pow]
+  simp [div_eq_mul_inv]
+
+/-- The weight of a coefficient of the node polynomial in the error constant:
+`c m!/l! · h/(m+1)! = (1/l!) h · c/(m+1)`. -/
+theorem mul_factorial_div_mul_div (c h : ℝ) (l m : ℕ) :
+    c * (m ! : ℝ) / (l ! : ℝ) * (h / ((m + 1)! : ℝ)) =
+      (l ! : ℝ)⁻¹ * h * (c / ((m : ℝ) + 1)) := by
+  have hl : (l ! : ℝ) ≠ 0 := by positivity
+  have hm : (m ! : ℝ) ≠ 0 := by positivity
+  have hm1 : (m : ℝ) + 1 ≠ 0 := by positivity
+  rw [Nat.factorial_succ]
+  push_cast
+  field_simp
+
 /-- **The constant of the paper:** `γ_l = (1/l!) ∫₀¹ ∏_{r<l} (s + r) ds`. -/
 theorem adamsGamma_eq_integral (l : ℕ) :
     adamsGamma l = ((l ! : ℝ))⁻¹ * ∫ s in (0 : ℝ)..1, ∏ r ∈ range l, (s + r) := by
@@ -171,39 +199,34 @@ theorem adamsGamma_eq_integral (l : ℕ) :
     rw [← ascPochhammer_eval_eq_prod_range, eval_eq_sum_range, ascPochhammer_natDegree]
     rfl
   simp_rw [h]
-  have hint : ∀ m ∈ range (l + 1),
-      IntervalIntegrable (fun s : ℝ => adamsCoeff l m * s ^ m) MeasureTheory.volume 0 1 :=
-    fun m _ => (continuous_const.mul (continuous_pow m)).intervalIntegrable _ _
-  rw [intervalIntegral.integral_finsetSum hint]
-  unfold adamsGamma
-  congr 1
-  refine sum_congr rfl fun m _ => ?_
-  rw [intervalIntegral.integral_const_mul, integral_pow]
-  simp [div_eq_mul_inv]
+  rw [integral_sum_mul_pow]
+  rfl
+
+/-- The constants `γ_1, …, γ_4`, from the recursion for the coefficients of the node
+polynomial: `γ_1 = 1/2`, `γ_2 = 5/12`, `γ_3 = 3/8`, `γ_4 = 251/720`. -/
+theorem adamsGamma_one_to_four :
+    adamsGamma 1 = 1 / 2 ∧ adamsGamma 2 = 5 / 12 ∧ adamsGamma 3 = 3 / 8 ∧
+      adamsGamma 4 = 251 / 720 := by
+  refine ⟨?_, ?_, ?_, ?_⟩ <;>
+  · simp [adamsGamma, sum_range_succ, adamsCoeff_succ_succ, adamsCoeff_succ_zero,
+      adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
+    norm_num
 
 /-- `γ_1 = 1/2`. -/
-theorem adamsGamma_one : adamsGamma 1 = 1 / 2 := by
-  simp [adamsGamma, sum_range_succ, adamsCoeff_succ_succ, adamsCoeff_succ_zero,
-    adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
-  norm_num
+theorem adamsGamma_one : adamsGamma 1 = 1 / 2 :=
+  adamsGamma_one_to_four.1
 
 /-- `γ_2 = 5/12`. -/
-theorem adamsGamma_two : adamsGamma 2 = 5 / 12 := by
-  simp [adamsGamma, sum_range_succ, adamsCoeff_succ_succ, adamsCoeff_succ_zero,
-    adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
-  norm_num
+theorem adamsGamma_two : adamsGamma 2 = 5 / 12 :=
+  adamsGamma_one_to_four.2.1
 
 /-- `γ_3 = 3/8`. -/
-theorem adamsGamma_three : adamsGamma 3 = 3 / 8 := by
-  simp [adamsGamma, sum_range_succ, adamsCoeff_succ_succ, adamsCoeff_succ_zero,
-    adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
-  norm_num
+theorem adamsGamma_three : adamsGamma 3 = 3 / 8 :=
+  adamsGamma_one_to_four.2.2.1
 
 /-- `γ_4 = 251/720`. -/
-theorem adamsGamma_four : adamsGamma 4 = 251 / 720 := by
-  simp [adamsGamma, sum_range_succ, adamsCoeff_succ_succ, adamsCoeff_succ_zero,
-    adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
-  norm_num
+theorem adamsGamma_four : adamsGamma 4 = 251 / 720 :=
+  adamsGamma_one_to_four.2.2.2
 
 /-- The node polynomial of two samples is `s² + s`: its coefficient of `s` is `1`. -/
 theorem adamsCoeff_two_one : adamsCoeff 2 1 = 1 := by

@@ -58,17 +58,6 @@ open OneStep
 
 variable {n : ℕ}
 
-/-- From the matrix elements to the spectral norm: if `|⟪x, W y⟫| ≤ K ‖x‖ ‖y‖` for all `x`, `y`,
-then `‖W‖ ≤ K`. -/
-theorem norm_opE_le_of_abs_inner_le {W : Matrix (Fin n) (Fin n) ℝ} {K : ℝ} (hK : 0 ≤ K)
-    (h : ∀ x y : EuclideanSpace ℝ (Fin n), |⟪x, opE W y⟫| ≤ K * (‖x‖ * ‖y‖)) :
-    ‖opE W‖ ≤ K := by
-  refine ContinuousLinearMap.opNorm_le_of_re_inner_le hK fun u v hu hv => ?_
-  have h1 := h v u
-  rw [hu, hv, mul_one, mul_one] at h1
-  rw [RCLike.re_to_real, real_inner_comm]
-  exact (le_abs_self _).trans h1
-
 namespace HeldScheme
 
 /-! ### The constants -/
@@ -132,6 +121,13 @@ theorem zohCons_constants_le {σ α H Z W : ℝ} (hσ : 0 ≤ σ) (hα : 0 ≤ �
   unfold zohStepK zohDiffK zohDampK
   refine ⟨?_, ?_, ?_⟩ <;> linarith
 
+/-- For `H ‖A‖ ≤ 1/24`: `H ‖A‖ ≤ 1/4` and `b H ≤ 1/3` with the constant `b = 8 ‖A‖` of the
+zero-order hold. -/
+theorem zohConsB_mul_le {α H : ℝ} (h : H * α ≤ 1 / 24) :
+    H * α ≤ 1 / 4 ∧ zohConsB α * H ≤ 1 / 3 := by
+  unfold zohConsB
+  constructor <;> linarith
+
 /-! ### Every scheme with one held sample -/
 
 section General
@@ -151,9 +147,7 @@ theorem norm_X_sub_one_le (hN : ‖opE S.N‖ ≤ 1 / 2) :
   have h := norm_add₃_le (a := opE (S.F - 1)) (b := opE (S.M + S.N))
     (c := opE (S.N * (S.X - 1)))
   rw [← opE_add, ← opE_add, ← e] at h
-  have h1 : ‖opE (S.N * (S.X - 1))‖ ≤ ‖opE S.N‖ * ‖opE (S.X - 1)‖ := by
-    rw [opE_mul]
-    exact norm_mul_le _ _
+  have h1 := norm_opE_mul_le S.N (S.X - 1)
   have h2 := mul_le_mul_of_nonneg_right hN (norm_nonneg (opE (S.X - 1)))
   linarith
 
@@ -176,9 +170,7 @@ theorem norm_X_sub_step_le (A₀ Ac U : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
   have h3 := norm_add₃_le (a := opE (S.F - (1 + H • A₀))) (b := opE (S.M + S.N - H • Ac))
     (c := opE (S.N * (S.X - 1)))
   rw [← opE_add, ← opE_add] at h3
-  have h1 : ‖opE (S.N * (S.X - 1))‖ ≤ ‖opE S.N‖ * ‖opE (S.X - 1)‖ := by
-    rw [opE_mul]
-    exact norm_mul_le _ _
+  have h1 := norm_opE_mul_le S.N (S.X - 1)
   linarith
 
 include S in
@@ -247,6 +239,16 @@ theorem norm_opE_coupling_le_two [Fintype κ] (A : Matrix (Fin n) (Fin n) ℝ) :
   have h2 := S.norm_opE_blockDiag_le A
   linarith
 
+/-- **The parts of `A` in `‖A‖` alone:** `‖A₀‖ ≤ ‖A‖`, `‖A_c‖ ≤ 2 ‖A‖` and, for `H ≥ 0` and
+`H ‖A‖ ≤ 1/4`, `H ‖A₀‖ ≤ 1/4` and `e^{H‖A₀‖} ≤ 4/3`. -/
+theorem norm_parts_le [Fintype κ] (A : Matrix (Fin n) (Fin n) ℝ) {H : ℝ} (hH : 0 ≤ H)
+    (hAH : H * ‖opE A‖ ≤ 1 / 4) :
+    ‖opE (S.blockDiag A)‖ ≤ ‖opE A‖ ∧ ‖opE (S.coupling A)‖ ≤ 2 * ‖opE A‖ ∧
+      H * ‖opE (S.blockDiag A)‖ ≤ 1 / 4 ∧ Real.exp (H * ‖opE (S.blockDiag A)‖) ≤ 4 / 3 := by
+  have h0 : ‖opE (S.blockDiag A)‖ ≤ ‖opE A‖ := S.norm_opE_blockDiag_le A
+  have hx : H * ‖opE (S.blockDiag A)‖ ≤ 1 / 4 := (mul_le_mul_of_nonneg_left h0 hH).trans hAH
+  exact ⟨h0, S.norm_opE_coupling_le_two A, hx, (Real.exp_le_exp.2 hx).trans exp_quarter_le⟩
+
 /-! ### The coefficients of the zero-order hold -/
 
 /-- **The coefficients of the zero-order hold to first order:** for `H ≥ 0` and `H ‖A₀‖ ≤ 1/4`,
@@ -310,13 +312,8 @@ theorem norm_opE_zohNew_le [Fintype κ] (A : Matrix (Fin n) (Fin n) ℝ) (H : �
     rw [e', ← hp]
     by_cases hs : S.stage (S.sub q) < S.stage (S.sub p) <;> simp [zohNew, hs]
   rw [e]
-  refine (abs_inner_opE_le _ x y).trans (mul_le_mul_of_nonneg_right ?_ (by positivity))
-  rw [opE_mul]
-  calc ‖opE (S.zohCoupling A H) * opE (S.early s)‖
-      ≤ ‖opE (S.zohCoupling A H)‖ * ‖opE (S.early s)‖ := norm_mul_le _ _
-    _ ≤ ‖opE (S.zohCoupling A H)‖ * 1 :=
-        mul_le_mul_of_nonneg_left (S.norm_opE_early_le s) (norm_nonneg _)
-    _ = ‖opE (S.zohCoupling A H)‖ := mul_one _
+  exact (abs_inner_opE_le _ x y).trans (mul_le_mul_of_nonneg_right
+    (norm_opE_mul_le_of_norm_le_one _ (S.norm_opE_early_le s)) (by positivity))
 
 /-- **The two Taylor brackets of the zero-order hold are of third order:** for `H ≥ 0`,
 `‖(e^{H A₀} - 1 - H A₀ - ½H² A₀²) + (G°C - H A_c - ½H² A₀ A_c)‖ ≤ zohC ‖A₀‖ ‖A_c‖ H · H³`. -/
@@ -342,15 +339,10 @@ theorem zoh_taylor_constants_le [Fintype κ] (A : Matrix (Fin n) (Fin n) ℝ) {H
       zohC ‖opE (S.blockDiag A)‖ ‖opE (S.coupling A)‖ H ≤ 2 / 3 * ‖opE A‖ ^ 3 ∧
       ‖opE (S.blockDiag A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blockDiag A)‖) ≤
         2 / 9 * ‖opE A‖ ^ 3 := by
-  have hα₀ : 0 ≤ ‖opE (S.blockDiag A)‖ := norm_nonneg _
-  have hγ0 : 0 ≤ ‖opE (S.coupling A)‖ := norm_nonneg _
-  have h0 : ‖opE (S.blockDiag A)‖ ≤ ‖opE A‖ := S.norm_opE_blockDiag_le A
-  have hγ : ‖opE (S.coupling A)‖ ≤ 2 * ‖opE A‖ := S.norm_opE_coupling_le_two A
-  have hE₀ : Real.exp (H * ‖opE (S.blockDiag A)‖) ≤ 4 / 3 :=
-    (Real.exp_le_exp.2 ((mul_le_mul_of_nonneg_left h0 hH).trans hAH)).trans exp_quarter_le
-  have h3 : ‖opE (S.blockDiag A)‖ ^ 3 ≤ ‖opE A‖ ^ 3 := pow_le_pow_left₀ hα₀ h0 3
+  obtain ⟨h0, hγ, -, hE₀⟩ := S.norm_parts_le A hH hAH
+  have h3 : ‖opE (S.blockDiag A)‖ ^ 3 ≤ ‖opE A‖ ^ 3 := pow_le_pow_left₀ (norm_nonneg _) h0 3
   have h2 : ‖opE (S.blockDiag A)‖ ^ 2 * ‖opE (S.coupling A)‖ ≤ ‖opE A‖ ^ 2 * (2 * ‖opE A‖) :=
-    mul_le_mul (pow_le_pow_left₀ hα₀ h0 2) hγ hγ0 (by positivity)
+    mul_le_mul (pow_le_pow_left₀ (norm_nonneg _) h0 2) hγ (norm_nonneg _) (by positivity)
   refine ⟨(Real.exp_le_exp.2 hAH).trans exp_quarter_le, ?_, ?_⟩
   · rw [zohC]
     calc (‖opE (S.blockDiag A)‖ ^ 3 / 6 + ‖opE (S.blockDiag A)‖ ^ 2 / 6 * ‖opE (S.coupling A)‖) *
@@ -363,6 +355,23 @@ theorem zoh_taylor_constants_le [Fintype κ] (A : Matrix (Fin n) (Fin n) ℝ) {H
           mul_le_mul (by linarith) hE₀ (Real.exp_nonneg _) (by positivity)
       _ = 2 / 9 * ‖opE A‖ ^ 3 := by ring
 
+/-- **The constants of the zero-order hold in `σ` and `‖A‖` alone:** for `H ≥ 0`, `H ‖A‖ ≤ 1/4`
+and `σ ≥ 0`, the three bounds of `zohCons_constants_le` hold with the Taylor constants of the
+zero-order hold, `Z = zohC ‖A₀‖ ‖A_c‖ H` and `W = ‖A₀‖³/6 · e^{H‖A₀‖}`. -/
+theorem zoh_constants_le [Fintype κ] (A : Matrix (Fin n) (Fin n) ℝ) {H σ : ℝ} (hH : 0 ≤ H)
+    (hAH : H * ‖opE A‖ ≤ 1 / 4) (hσ : 0 ≤ σ) :
+    (σ * reactionC (zohConsA σ ‖opE A‖) (zohConsB ‖opE A‖) (zohConsC σ ‖opE A‖) ‖opE A‖ H +
+        zohC ‖opE (S.blockDiag A)‖ ‖opE (S.coupling A)‖ H ≤ zohStepK σ ‖opE A‖) ∧
+      (diffLeadC (zohConsB ‖opE A‖) (zohConsC σ ‖opE A‖) ‖opE A‖ +
+        σ * reactionC (zohConsA σ ‖opE A‖) (zohConsB ‖opE A‖) (zohConsC σ ‖opE A‖) ‖opE A‖ H +
+        zohC ‖opE (S.blockDiag A)‖ ‖opE (S.coupling A)‖ H ≤ zohDiffK σ ‖opE A‖) ∧
+      (diffLeadC (zohConsB ‖opE A‖) (zohConsC σ ‖opE A‖) ‖opE A‖ +
+        reactionC (zohConsA σ ‖opE A‖) (zohConsB ‖opE A‖) (zohConsC σ ‖opE A‖) ‖opE A‖ H +
+        ‖opE (S.blockDiag A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blockDiag A)‖) ≤
+          zohDampK σ ‖opE A‖) := by
+  obtain ⟨h1, h2, h3⟩ := S.zoh_taylor_constants_le A hH hAH
+  exact zohCons_constants_le hσ (norm_nonneg _) h1 h2 h3
+
 /-! ### The zero-order hold is consistent -/
 
 /-- **The local maps and the coefficients of the samples of the zero-order hold are `1 + O(H)`
@@ -372,11 +381,7 @@ theorem norm_zoh_local_samples_le [Fintype κ] (A : Matrix (Fin n) (Fin n) ℝ) 
     (hH : 0 ≤ H) (hAH : H * ‖opE A‖ ≤ 1 / 4) :
     ‖opE (NormedSpace.exp (H • S.blockDiag A) - 1)‖ ≤ 4 / 3 * ‖opE A‖ * H ∧
       ‖opE (S.zohCoupling A H)‖ ≤ 7 / 3 * ‖opE A‖ * H := by
-  have h0 : ‖opE (S.blockDiag A)‖ ≤ ‖opE A‖ := S.norm_opE_blockDiag_le A
-  have hγ : ‖opE (S.coupling A)‖ ≤ 2 * ‖opE A‖ := S.norm_opE_coupling_le_two A
-  have hx : H * ‖opE (S.blockDiag A)‖ ≤ 1 / 4 := (mul_le_mul_of_nonneg_left h0 hH).trans hAH
-  have hE₀ : Real.exp (H * ‖opE (S.blockDiag A)‖) ≤ 4 / 3 :=
-    (Real.exp_le_exp.2 hx).trans exp_quarter_le
+  obtain ⟨h0, hγ, hx, hE₀⟩ := S.norm_parts_le A hH hAH
   constructor
   · refine (norm_opE_exp_sub_one_le (S.blockDiag A) hH).trans ?_
     calc ‖opE (S.blockDiag A)‖ * Real.exp (H * ‖opE (S.blockDiag A)‖) * H
@@ -400,13 +405,7 @@ theorem zoh_consistent_of_new_le [Fintype κ] {A : Matrix (Fin n) (Fin n) ℝ}
     (S.zoh A hA H).Consistent A (NormedSpace.exp (H • A)) H (zohConsA σ ‖opE A‖)
       (zohConsB ‖opE A‖) (zohConsC σ ‖opE A‖) := by
   have hα : 0 ≤ ‖opE A‖ := norm_nonneg _
-  have hα₀ : 0 ≤ ‖opE (S.blockDiag A)‖ := norm_nonneg _
-  have hγ0 : 0 ≤ ‖opE (S.coupling A)‖ := norm_nonneg _
-  have h0 : ‖opE (S.blockDiag A)‖ ≤ ‖opE A‖ := S.norm_opE_blockDiag_le A
-  have hγ : ‖opE (S.coupling A)‖ ≤ 2 * ‖opE A‖ := S.norm_opE_coupling_le_two A
-  have hx : H * ‖opE (S.blockDiag A)‖ ≤ 1 / 4 := (mul_le_mul_of_nonneg_left h0 hH).trans hAH
-  have hE₀ : Real.exp (H * ‖opE (S.blockDiag A)‖) ≤ 4 / 3 :=
-    (Real.exp_le_exp.2 hx).trans exp_quarter_le
+  obtain ⟨h0, hγ, hx, hE₀⟩ := S.norm_parts_le A hH hAH
   have hE : Real.exp (H * ‖opE A‖) ≤ 4 / 3 := (Real.exp_le_exp.2 hAH).trans exp_quarter_le
   have eF : (S.zoh A hA H).F = NormedSpace.exp (H • S.blockDiag A) := rfl
   have eN : (S.zoh A hA H).N = S.zohNew A H := rfl
@@ -437,14 +436,14 @@ theorem zoh_consistent_of_new_le [Fintype κ] {A : Matrix (Fin n) (Fin n) ℝ}
       calc ‖opE (S.blockDiag A)‖ ^ 2 / 2 * Real.exp (H * ‖opE (S.blockDiag A)‖) * H ^ 2
           ≤ ‖opE A‖ ^ 2 / 2 * (4 / 3) * H ^ 2 :=
             mul_le_mul_of_nonneg_right (mul_le_mul
-              (div_le_div_of_nonneg_right (pow_le_pow_left₀ hα₀ h0 2) zero_le_two) hE₀
+              (div_le_div_of_nonneg_right (pow_le_pow_left₀ (norm_nonneg _) h0 2) zero_le_two) hE₀
               (Real.exp_nonneg _) (by positivity)) (by positivity)
         _ = 2 / 3 * ‖opE A‖ ^ 2 * H ^ 2 := by ring
     have t2 : ‖opE (S.zohCoupling A H - H • S.coupling A)‖ ≤
         10 / 9 * ‖opE A‖ ^ 2 * H ^ 2 := by
       refine (S.norm_opE_zohCoupling_sub_le A hH hx).trans ?_
       have h5 : ‖opE (S.blockDiag A)‖ * ‖opE (S.coupling A)‖ ≤ ‖opE A‖ * (2 * ‖opE A‖) :=
-        mul_le_mul h0 hγ hγ0 hα
+        mul_le_mul h0 hγ (norm_nonneg _) hα
       have h6 := mul_le_mul_of_nonneg_right h5 (sq_nonneg H)
       linarith
     have t3 : ‖opE (S.zohNew A H)‖ * ‖opE ((S.zoh A hA H).X - 1)‖ ≤
@@ -497,9 +496,8 @@ theorem norm_zoh_step_sub_le [Fintype κ] {A : Matrix (Fin n) (Fin n) ℝ}
         (H ^ 2 / 2) • (S.signedCoupling A * A))‖ ≤
       zohStepK (Real.sqrt (Fintype.card κ)) ‖opE A‖ * H ^ 3 := by
   have hc := S.zoh_consistent hA hH hAH hσ
-  have ht := S.zoh_taylor_constants_le A hH hAH
   refine (norm_zoh_sub_le hc).trans (mul_le_mul_of_nonneg_right ?_ (by positivity))
-  exact (zohCons_constants_le (Real.sqrt_nonneg _) (norm_nonneg _) ht.1 ht.2.1 ht.2.2).1
+  exact (S.zoh_constants_le A hH hAH (Real.sqrt_nonneg _)).1
 
 /-! ### Equation (halfstep) for the zero-order hold -/
 
@@ -515,17 +513,13 @@ theorem norm_zoh_difference_sub_half_le [Fintype κ] {A : Matrix (Fin n) (Fin n)
     (hσ : Real.sqrt (Fintype.card κ) * (H * ‖opE A‖) ≤ 1 / 6) :
     ‖opE (difference A H (S.zoh A hA H).X - (H / 2) • (S.signedCoupling A * A))‖ ≤
       zohDiffK (Real.sqrt (Fintype.card κ)) ‖opE A‖ * H ^ 2 := by
-  have hAH4 : H * ‖opE A‖ ≤ 1 / 4 := hAH.trans (by norm_num)
+  obtain ⟨hAH4, hbH⟩ := zohConsB_mul_le hAH
   have hc := S.zoh_consistent hA hH.le hAH4 hσ
-  have ht := S.zoh_taylor_constants_le A hH.le hAH4
-  have hbH : zohConsB ‖opE A‖ * H ≤ 1 / 3 := by
-    unfold zohConsB
-    linarith
   have he := S.norm_zoh_brackets_le A hH.le
   rw [← S.zohOld_add_zohNew A H] at he
   have h := hc.norm_difference_sub_half_le hH hbH hAH4 he
   refine h.trans (mul_le_mul_of_nonneg_right ?_ (by positivity))
-  exact (zohCons_constants_le (Real.sqrt_nonneg _) (norm_nonneg _) ht.1 ht.2.1 ht.2.2).2.1
+  exact (S.zoh_constants_le A hH.le hAH4 (Real.sqrt_nonneg _)).2.1
 
 end HeldScheme
 

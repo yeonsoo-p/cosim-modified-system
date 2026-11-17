@@ -37,7 +37,7 @@ which depends on the constants of consistency and on `‖A‖` only: neither on 
   and with `ν = numDamping A H X = tr Δ_R` (`Consistent.amount_numDamping`). Proof: `Δ_R` is
   symmetric (`isSymm_numDissipation`), `x` and `y` are orthonormal, and `thm:triple` in the form
   `2 |⟪x, Δ_R y⟫| ≤ tr Δ_R + n ι` (`two_mul_abs_inner_opE_le_trace_add`, from
-  `abs_inner_add_inner_le_trace_sub` of `TripleLawGeneral`).
+  `abs_inner_add_inner_le_trace_sub`, both of `TripleLawGeneral`).
 * **Spread form** (`Consistent.amount_spread`):
     `(H/2) |⟪x, A (ς_i + ς_j) A y⟫| - K H² ≤ μ + ι`
   (`two_mul_abs_inner_opE_le_spread`, from `abs_inner_add_inner_le_spread` of `SpreadLaw`). There
@@ -74,7 +74,7 @@ open OneStep
 
 variable {n : ℕ}
 
-/-! ### The numerical dissipation is symmetric; the two laws for the operator of a matrix -/
+/-! ### The numerical dissipation is symmetric; the spread form for the operator of a matrix -/
 
 /-- **The numerical dissipation is symmetric:** `Δ_Rᵀ = Δ_R` for `Δ_R = -sym (Ã - A)`. -/
 theorem isSymm_numDissipation (A At : Matrix (Fin n) (Fin n) ℝ) :
@@ -90,26 +90,6 @@ theorem inner_numDissipation_self (A At : Matrix (Fin n) (Fin n) ℝ)
   rw [inner_numDissipation]
   ring
 
-/-- For a symmetric matrix the bilinear form on Euclidean space is symmetric:
-`⟪y, T x⟫ = ⟪x, T y⟫`. -/
-theorem inner_opE_comm_of_isSymm {T : Matrix (Fin n) (Fin n) ℝ} (hT : T.IsSymm)
-    (x y : EuclideanSpace ℝ (Fin n)) : ⟪y, opE T x⟫ = ⟪x, opE T y⟫ := by
-  rw [inner_opE_transpose, hT.eq]
-
-/-- **Theorem `thm:triple` for the operator of a symmetric matrix** (eq. `eq:triplenu`). If `T` is
-symmetric and `-ι ‖v‖² ≤ ⟪v, T v⟫` for all `v` (as `ι = -λ_min (T)`), then for orthonormal `e`,
-`f`: `2 |⟪e, T f⟫| ≤ tr T + n ι`. -/
-theorem two_mul_abs_inner_opE_le_trace_add {T : Matrix (Fin n) (Fin n) ℝ} (hT : T.IsSymm)
-    {ι : ℝ} (hlo : ∀ v : EuclideanSpace ℝ (Fin n), -ι * ‖v‖ ^ 2 ≤ ⟪v, opE T v⟫)
-    {e f : EuclideanSpace ℝ (Fin n)} (he : ‖e‖ = 1) (hf : ‖f‖ = 1) (hef : ⟪e, f⟫ = 0) :
-    2 * |⟪e, opE T f⟫| ≤ T.trace + (n : ℝ) * ι := by
-  have h := abs_inner_add_inner_le_trace_sub
-    ((opE T : EuclideanSpace ℝ (Fin n) →L[ℝ] EuclideanSpace ℝ (Fin n)) :
-      EuclideanSpace ℝ (Fin n) →ₗ[ℝ] EuclideanSpace ℝ (Fin n)) (lam := -ι) hlo he hf hef
-  rw [trace_opE, finrank_euclideanSpace_fin, ContinuousLinearMap.coe_coe,
-    inner_opE_comm_of_isSymm hT e f, ← two_mul, abs_mul, abs_two] at h
-  linarith
-
 /-- **The spread form for the operator of a symmetric matrix.** If `T` is symmetric and
 `-ι ‖v‖² ≤ ⟪v, T v⟫ ≤ μ ‖v‖²` for all `v` (as `μ = λ_max (T)`, `ι = -λ_min (T)`), then for
 orthonormal `e`, `f`: `2 |⟪e, T f⟫| ≤ μ + ι`. -/
@@ -117,13 +97,8 @@ theorem two_mul_abs_inner_opE_le_spread {T : Matrix (Fin n) (Fin n) ℝ} (hT : T
     {μ ι : ℝ} (hlo : ∀ v : EuclideanSpace ℝ (Fin n), -ι * ‖v‖ ^ 2 ≤ ⟪v, opE T v⟫)
     (hhi : ∀ v : EuclideanSpace ℝ (Fin n), ⟪v, opE T v⟫ ≤ μ * ‖v‖ ^ 2)
     {e f : EuclideanSpace ℝ (Fin n)} (he : ‖e‖ = 1) (hf : ‖f‖ = 1) (hef : ⟪e, f⟫ = 0) :
-    2 * |⟪e, opE T f⟫| ≤ μ + ι := by
-  have h := abs_inner_add_inner_le_spread
-    ((opE T : EuclideanSpace ℝ (Fin n) →L[ℝ] EuclideanSpace ℝ (Fin n)) :
-      EuclideanSpace ℝ (Fin n) →ₗ[ℝ] EuclideanSpace ℝ (Fin n)) hlo hhi he hf hef
-  rw [ContinuousLinearMap.coe_coe, inner_opE_comm_of_isSymm hT e f, ← two_mul, abs_mul,
-    abs_two] at h
-  exact h
+    2 * |⟪e, opE T f⟫| ≤ μ + ι :=
+  two_mul_abs_inner_le_spread _ (isSymmetric_opE hT) hlo hhi he hf hef
 
 /-- A Euclidean space with a unit vector has a positive number of coordinates. -/
 theorem natCast_pos_of_norm_eq_one {x : EuclideanSpace ℝ (Fin n)} (hx : ‖x‖ = 1) :
@@ -164,17 +139,7 @@ variable {κ : Type*}
 theorem abs_inner_sgn_add_jacobi (S : HeldScheme n κ) (A : Matrix (Fin n) (Fin n) ℝ)
     (hJ : ∀ k k' : κ, S.stage k = S.stage k') (i j : κ) (x y : EuclideanSpace ℝ (Fin n)) :
     |⟪x, opE (A * (S.sgn i + S.sgn j) * A) y⟫| = 2 * |⟪x, opE (A * A) y⟫| := by
-  have hsg : ∀ s k : κ, S.sg s k = -1 := fun s k => by
-    have hlt : ¬ S.stage k < S.stage s := by rw [hJ k s]; exact lt_irrefl _
-    unfold sg
-    rw [ite_eq_right hlt]
-  have e : A * (S.sgn i + S.sgn j) * A = (-2 : ℝ) • (A * A) := by
-    ext p q
-    rw [S.sgn_add_entry, Matrix.smul_apply, Matrix.mul_apply, smul_eq_mul, Finset.mul_sum]
-    refine Finset.sum_congr rfl fun r _ => ?_
-    rw [hsg, hsg]
-    ring
-  rw [e, inner_opE_smul, abs_mul, abs_neg, abs_two]
+  rw [mul_sgn_add_mul_of_jacobi hJ, inner_opE_smul, abs_mul, abs_neg, abs_two]
 
 /-- **The leading term through a single common partner that does not run between the two.** If
 `i` and `j` are joined only through `k` (`A p r * A r q = 0` unless `r` is a state of `k`) and
@@ -196,12 +161,7 @@ theorem abs_inner_sgn_add_partner [DecidableEq κ] (S : HeldScheme n κ)
       linear_combination -(A p r * A r q) * hs
     · rw [ite_eq_right hr]
       linear_combination (S.sg i (S.sub r) + S.sg j (S.sub r)) * hpq p q r hp hq hr
-  have hσ : |S.sg i k| = 1 := by
-    unfold sg
-    by_cases hlt : S.stage k < S.stage i
-    · rw [ite_eq_left hlt, abs_one]
-    · rw [ite_eq_right hlt, abs_neg, abs_one]
-  rw [e, inner_opE_smul, abs_mul, abs_mul, abs_two, hσ, mul_one]
+  rw [e, inner_opE_smul, abs_mul, abs_mul, abs_two, S.abs_sg i k, mul_one]
 
 /-! ### The amount for the modified system -/
 

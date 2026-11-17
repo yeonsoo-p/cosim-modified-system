@@ -126,34 +126,29 @@ theorem proj_pow_succ_apply (hA : P ∘L A = Ai ∘L P + ∑ j, L j ∘L C j) (m
   rw [h]
   exact h'
 
-/-- **The own state along the derivatives, on the states not shown:**
-`‖H^m P A^m v‖ ≤ Θ H (H ‖A‖)^l ‖v‖` for `m ≤ l`, if `P v = 0` and all samples of `v` vanish. -/
-theorem norm_pow_smul_proj_le (hA : P ∘L A = Ai ∘L P + ∑ j, L j ∘L C j)
-    (hW : ∀ j, W j * Matrix.vandermonde (x j) = 1) {H : ℝ} (hH : 0 ≤ H) (hHA : H * ‖A‖ ≤ 1)
-    (hHAi : H * ‖Ai‖ ≤ 1) {v : E} (hPv : P v = 0)
-    (hv : ∀ j q, C j (exp ((x j q * H) • A) v) = 0) {m : ℕ} (hm : m ≤ l) :
-    ‖H ^ m • P ((A ^ m) v)‖ ≤ defectTheta C L x W * (H * (H * ‖A‖) ^ l * ‖v‖) := by
-  have hK : 0 ≤ H * (H * ‖A‖) ^ l * ‖v‖ := by positivity
-  set K := H * (H * ‖A‖) ^ l * ‖v‖ with hKdef
-  set θ : ℕ → ℝ := fun k => if h : k < l then ∑ j, ‖L j‖ * ((k ! : ℝ) * ‖C j‖ *
-    (|ddBeta (x j) (W j) ⟨k, h⟩| / (l ! : ℝ) + ddOmega (x j) (W j) (l + 1) ⟨k, h⟩)) else 0
-    with hθ
+/-- **The own state along the derivatives, from bounds of the coupling row.** If `P v = 0`,
+`0 ≤ H`, `H ‖Ai‖ ≤ 1` and `‖Σ_j L j (H^k C j A^k v)‖ ≤ b k` for `k < l`, then
+`‖H^m P A^m v‖ ≤ H Σ_{k<l} b k` for `m ≤ l`: by the coupling row,
+`H^{k+1} P A^{k+1} v = H Ai (H^k P A^k v) + H Σ_j L j (H^k C j A^k v)`. -/
+theorem norm_pow_smul_proj_le_sum (hA : P ∘L A = Ai ∘L P + ∑ j, L j ∘L C j) {H : ℝ}
+    (hH : 0 ≤ H) (hHAi : H * ‖Ai‖ ≤ 1) {v : E} (hPv : P v = 0) (b : Fin l → ℝ)
+    (hb0 : ∀ k, 0 ≤ b k)
+    (hb : ∀ k : Fin l, ‖∑ j, L j (H ^ (k : ℕ) • C j ((A ^ (k : ℕ)) v))‖ ≤ b k) {m : ℕ}
+    (hm : m ≤ l) : ‖H ^ m • P ((A ^ m) v)‖ ≤ H * ∑ k : Fin l, b k := by
+  set θ : ℕ → ℝ := fun k => if h : k < l then b ⟨k, h⟩ else 0 with hθ
   have hθ0 : ∀ k, 0 ≤ θ k := fun k => by
     rw [hθ]
     dsimp only
     split_ifs with h
-    · refine sum_nonneg fun j _ => ?_
-      have := ddOmega_nonneg (x j) (W j) (l + 1) ⟨k, h⟩
-      positivity
+    · exact hb0 _
     · exact le_rfl
-  have hθsum : ∑ k ∈ range l, θ k = defectTheta C L x W := by
+  have hθsum : ∑ k ∈ range l, θ k = ∑ k : Fin l, b k := by
     rw [← Fin.sum_univ_eq_sum_range θ l]
-    unfold defectTheta
     refine sum_congr rfl fun p _ => ?_
     rw [hθ]
     dsimp only
     rw [dite_eq_left p.2]
-  have key : ∀ m, m ≤ l → ‖H ^ m • P ((A ^ m) v)‖ ≤ (∑ k ∈ range m, θ k) * K := by
+  have key : ∀ m, m ≤ l → ‖H ^ m • P ((A ^ m) v)‖ ≤ H * ∑ k ∈ range m, θ k := by
     intro m
     induction m with
     | zero =>
@@ -168,7 +163,7 @@ theorem norm_pow_smul_proj_le (hA : P ∘L A = Ai ∘L P + ∑ j, L j ∘L C j)
       have hrec : H ^ (m + 1) • P ((A ^ (m + 1)) v) =
           H • Ai (H ^ m • P ((A ^ m) v)) + H • ∑ j, L j (H ^ m • C j ((A ^ m) v)) := by
         rw [proj_pow_succ_apply hA, pow_succ', mul_smul, h1, smul_add]
-      have h2 : ‖H • Ai (H ^ m • P ((A ^ m) v))‖ ≤ (∑ k ∈ range m, θ k) * K := by
+      have h2 : ‖H • Ai (H ^ m • P ((A ^ m) v))‖ ≤ H * ∑ k ∈ range m, θ k := by
         rw [norm_smul, Real.norm_eq_abs, abs_of_nonneg hH]
         have h3 := Ai.le_opNorm (H ^ m • P ((A ^ m) v))
         have h4 := ih hml.le
@@ -179,28 +174,42 @@ theorem norm_pow_smul_proj_le (hA : P ∘L A = Ai ∘L P + ∑ j, L j ∘L C j)
         have h6 : H * ‖Ai‖ * ‖H ^ m • P ((A ^ m) v)‖ ≤ 1 * ‖H ^ m • P ((A ^ m) v)‖ :=
           mul_le_mul_of_nonneg_right hHAi (norm_nonneg _)
         linarith
-      have h7 : ‖H • ∑ j, L j (H ^ m • C j ((A ^ m) v))‖ ≤ θ m * K := by
+      have h7 : ‖H • ∑ j, L j (H ^ m • C j ((A ^ m) v))‖ ≤ H * θ m := by
         rw [norm_smul, Real.norm_eq_abs, abs_of_nonneg hH]
-        have h8 : ‖∑ j, L j (H ^ m • C j ((A ^ m) v))‖ ≤
-            ∑ j, ‖L j‖ * ((m ! : ℝ) * ‖C j‖ * (|ddBeta (x j) (W j) ⟨m, hml⟩| / (l ! : ℝ) +
-              ddOmega (x j) (W j) (l + 1) ⟨m, hml⟩) * (H * ‖A‖) ^ l * ‖v‖) := by
-          refine norm_sum_le_of_le _ fun j _ => ?_
-          have h9 := norm_pow_smul_le (hW j) (C j) A hH hHA (hv j) ⟨m, hml⟩
-          exact ((L j).le_opNorm _).trans (mul_le_mul_of_nonneg_left h9 (norm_nonneg _))
-        have h10 : θ m * K = H * ∑ j, ‖L j‖ * ((m ! : ℝ) * ‖C j‖ *
-            (|ddBeta (x j) (W j) ⟨m, hml⟩| / (l ! : ℝ) +
-              ddOmega (x j) (W j) (l + 1) ⟨m, hml⟩) * (H * ‖A‖) ^ l * ‖v‖) := by
-          rw [hθ]
-          dsimp only
-          rw [dite_eq_left hml, hKdef, sum_mul, mul_sum]
-          exact sum_congr rfl fun j _ => by ring
-        rw [h10]
-        exact mul_le_mul_of_nonneg_left h8 hH
-      rw [hrec, sum_range_succ, add_mul]
+        refine mul_le_mul_of_nonneg_left ?_ hH
+        rw [hθ]
+        dsimp only
+        rw [dite_eq_left hml]
+        exact hb ⟨m, hml⟩
+      rw [hrec, sum_range_succ, mul_add]
       exact (norm_add_le _ _).trans (add_le_add h2 h7)
-  refine (key m hm).trans (mul_le_mul_of_nonneg_right ?_ hK)
+  refine (key m hm).trans (mul_le_mul_of_nonneg_left ?_ hH)
   rw [← hθsum]
   exact sum_le_sum_of_subset_of_nonneg (range_mono hm) fun k _ _ => hθ0 k
+
+/-- **The own state along the derivatives, on the states not shown:**
+`‖H^m P A^m v‖ ≤ Θ H (H ‖A‖)^l ‖v‖` for `m ≤ l`, if `P v = 0` and all samples of `v` vanish. -/
+theorem norm_pow_smul_proj_le (hA : P ∘L A = Ai ∘L P + ∑ j, L j ∘L C j)
+    (hW : ∀ j, W j * Matrix.vandermonde (x j) = 1) {H : ℝ} (hH : 0 ≤ H) (hHA : H * ‖A‖ ≤ 1)
+    (hHAi : H * ‖Ai‖ ≤ 1) {v : E} (hPv : P v = 0)
+    (hv : ∀ j q, C j (exp ((x j q * H) • A) v) = 0) {m : ℕ} (hm : m ≤ l) :
+    ‖H ^ m • P ((A ^ m) v)‖ ≤ defectTheta C L x W * (H * (H * ‖A‖) ^ l * ‖v‖) := by
+  have h := norm_pow_smul_proj_le_sum hA hH hHAi hPv
+    (fun k : Fin l => ∑ j, ‖L j‖ * ((k ! : ℝ) * ‖C j‖ *
+      (|ddBeta (x j) (W j) k| / (l ! : ℝ) + ddOmega (x j) (W j) (l + 1) k) *
+        (H * ‖A‖) ^ l * ‖v‖))
+    (fun k => sum_nonneg fun j _ => by
+      have := ddOmega_nonneg (x j) (W j) (l + 1) k
+      positivity)
+    (fun k => norm_sum_le_of_le _ fun j _ => ((L j).le_opNorm _).trans
+      (mul_le_mul_of_nonneg_left (norm_pow_smul_le (hW j) (C j) A hH hHA (hv j) k)
+        (norm_nonneg _))) hm
+  refine h.trans_eq ?_
+  unfold defectTheta
+  rw [mul_sum, sum_mul]
+  refine sum_congr rfl fun k _ => ?_
+  rw [mul_sum, sum_mul]
+  exact sum_congr rfl fun j _ => by ring
 
 /-- **The block row of the monolithic step on the states not shown, to leading order** (the paper,
 proof of Theorem `thm:memory` (i), with eq. `eq:defectl` on the states not shown). For a state

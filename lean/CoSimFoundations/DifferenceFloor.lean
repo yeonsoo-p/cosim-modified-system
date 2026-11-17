@@ -35,22 +35,38 @@ theorem defect_apply_reference (At A : E →L[ℝ] E) (H : ℝ) (f : E) :
   change exp (H • At) (exp (H • (-A)) (exp (H • A) f)) = exp (H • At) f
   rw [h2]
 
+/-- **Link floor of the difference, from a bound of the defect.** If `‖e‖ = 1`,
+`e ⊥ exp (H Ã) f` and `‖exp (H Ã) exp (-H A) - 1‖ ≤ c`, then
+`|⟪e, exp (H A) f⟫| ≤ c ‖exp (H A) f‖`. -/
+theorem difference_link_floor_of_le (At A : E →L[ℝ] E) {H c : ℝ}
+    (hc : ‖exp (H • At) * exp (H • (-A)) - 1‖ ≤ c) {e : E} (he : ‖e‖ = 1) (f : E)
+    (h : ⟪e, exp (H • At) f⟫ = 0) : |⟪e, exp (H • A) f⟫| ≤ c * ‖exp (H • A) f‖ :=
+  (link_floor (exp (H • At) * exp (H • (-A))) (exp (H • A)) he f
+    (by rw [defect_apply_reference]; exact h)).trans
+    (mul_le_mul_of_nonneg_right hc (norm_nonneg _))
+
+/-- **Turning floor of the difference, from a bound of the defect.** If `‖e‖ = 1`,
+`0 ≤ ⟪e, exp (H Ã) e⟫` and `‖exp (H Ã) exp (-H A) - 1‖ ≤ c`, then
+`-⟪e, exp (H A) e⟫ ≤ c ‖exp (H A) e‖`. -/
+theorem difference_turning_floor_of_le (At A : E →L[ℝ] E) {H c : ℝ}
+    (hc : ‖exp (H • At) * exp (H • (-A)) - 1‖ ≤ c) {e : E} (he : ‖e‖ = 1)
+    (h : 0 ≤ ⟪e, exp (H • At) e⟫) : -⟪e, exp (H • A) e⟫ ≤ c * ‖exp (H • A) e‖ :=
+  (turning_floor (exp (H • At) * exp (H • (-A))) (exp (H • A)) he
+    (by rw [defect_apply_reference]; exact h)).trans
+    (mul_le_mul_of_nonneg_right hc (norm_nonneg _))
+
 /-- **Link floor of the difference.** -/
 theorem difference_link_floor (At A : E →L[ℝ] E) {H a b : ℝ} (hH : 0 ≤ H)
     (ha : ∀ τ ∈ Set.Icc 0 H, ‖exp (τ • At)‖ ≤ a) (hb : ∀ τ ∈ Set.Icc 0 H, ‖exp (τ • (-A))‖ ≤ b)
     {e : E} (he : ‖e‖ = 1) (f : E) (h : ⟪e, exp (H • At) f⟫ = 0) :
-    |⟪e, exp (H • A) f⟫| ≤ H * (a * ‖At - A‖ * b) * ‖exp (H • A) f‖ := by
-  have h1 := link_floor (exp (H • At) * exp (H • (-A))) (exp (H • A)) he f
-    (by rw [defect_apply_reference]; exact h)
-  exact h1.trans (mul_le_mul_of_nonneg_right (norm_defect_sub_one_le At A hH ha hb) (norm_nonneg _))
+    |⟪e, exp (H • A) f⟫| ≤ H * (a * ‖At - A‖ * b) * ‖exp (H • A) f‖ :=
+  difference_link_floor_of_le At A (norm_defect_sub_one_le At A hH ha hb) he f h
 
 /-- **Turning floor of the difference.** -/
 theorem difference_turning_floor (At A : E →L[ℝ] E) {H a b : ℝ} (hH : 0 ≤ H)
     (ha : ∀ τ ∈ Set.Icc 0 H, ‖exp (τ • At)‖ ≤ a) (hb : ∀ τ ∈ Set.Icc 0 H, ‖exp (τ • (-A))‖ ≤ b)
     {e : E} (he : ‖e‖ = 1) (h : 0 ≤ ⟪e, exp (H • At) e⟫) :
-    -⟪e, exp (H • A) e⟫ ≤ H * (a * ‖At - A‖ * b) * ‖exp (H • A) e‖ := by
-  have h1 := turning_floor (exp (H • At) * exp (H • (-A))) (exp (H • A)) he
-    (by rw [defect_apply_reference]; exact h)
-  exact h1.trans (mul_le_mul_of_nonneg_right (norm_defect_sub_one_le At A hH ha hb) (norm_nonneg _))
+    -⟪e, exp (H • A) e⟫ ≤ H * (a * ‖At - A‖ * b) * ‖exp (H • A) e‖ :=
+  difference_turning_floor_of_le At A (norm_defect_sub_one_le At A hH ha hb) he h
 
 end CoSimFoundations

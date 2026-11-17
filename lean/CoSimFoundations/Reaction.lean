@@ -57,37 +57,25 @@ variable {n : ℕ}
 /-- The matrix element of a scalar multiple of a matrix. -/
 theorem inner_opE_smul (c : ℝ) (T : Matrix (Fin n) (Fin n) ℝ) (x y : EuclideanSpace ℝ (Fin n)) :
     ⟪x, opE (c • T) y⟫ = c * ⟪x, opE T y⟫ := by
-  rw [inner_opE_eq_sum, inner_opE_eq_sum, Finset.mul_sum]
-  refine Finset.sum_congr rfl fun p _ => ?_
-  rw [Finset.mul_sum]
-  refine Finset.sum_congr rfl fun q _ => ?_
-  rw [Matrix.smul_apply, smul_eq_mul]
-  ring
+  rw [opE_smul, FunLike.coe_smul, Pi.smul_apply, inner_smul_right]
 
 /-- A matrix element with the first vector supported on a subsystem depends only on the rows of
 the matrix that belong to the subsystem. -/
 theorem inner_opE_congr_row {κ : Type*} {sub : Fin n → κ} {s : κ}
     {x : EuclideanSpace ℝ (Fin n)} (hx : ∀ p, sub p ≠ s → x p = 0)
     (y : EuclideanSpace ℝ (Fin n)) {T T' : Matrix (Fin n) (Fin n) ℝ}
-    (h : ∀ p q, sub p = s → T p q = T' p q) : ⟪x, opE T y⟫ = ⟪x, opE T' y⟫ := by
-  rw [inner_opE_eq_sum, inner_opE_eq_sum]
-  refine Finset.sum_congr rfl fun p _ => Finset.sum_congr rfl fun q _ => ?_
-  by_cases hp : sub p = s
-  · rw [h p q hp]
-  · rw [hx p hp, zero_mul, zero_mul, zero_mul, zero_mul]
+    (h : ∀ p q, sub p = s → T p q = T' p q) : ⟪x, opE T y⟫ = ⟪x, opE T' y⟫ :=
+  inner_opE_congr_of_ne_zero fun p q hp _ => h p q (not_imp_comm.1 (hx p) hp)
 
 /-- A matrix element vanishes if the block of the matrix between the supports vanishes. -/
 theorem inner_opE_eq_zero {κ : Type*} {sub : Fin n → κ} {s t : κ}
     {x y : EuclideanSpace ℝ (Fin n)} (hx : ∀ p, sub p ≠ s → x p = 0)
     (hy : ∀ q, sub q ≠ t → y q = 0) {T : Matrix (Fin n) (Fin n) ℝ}
     (h : ∀ p q, sub p = s → sub q = t → T p q = 0) : ⟪x, opE T y⟫ = 0 := by
-  rw [inner_opE_eq_sum]
-  refine Finset.sum_eq_zero fun p _ => Finset.sum_eq_zero fun q _ => ?_
-  by_cases hp : sub p = s
-  · by_cases hq : sub q = t
-    · rw [h p q hp hq, mul_zero, zero_mul]
-    · rw [hy q hq, mul_zero]
-  · rw [hx p hp, zero_mul, zero_mul]
+  rw [inner_opE_congr hx hy (T' := 0) fun p q hp hq =>
+      (h p q hp hq).trans (Matrix.zero_apply p q).symm,
+    show opE (0 : Matrix (Fin n) (Fin n) ℝ) = 0 from map_zero _, _root_.zero_apply,
+    inner_zero_right]
 
 /-- The component of the image of a vector under the operator of a matrix. -/
 theorem opE_apply (T : Matrix (Fin n) (Fin n) ℝ) (y : EuclideanSpace ℝ (Fin n)) (p : Fin n) :
@@ -134,24 +122,12 @@ theorem row_expand {A E : Matrix (Fin n) (Fin n) ℝ} {H : ℝ}
     (hE : ∀ p q, S.sub p ≠ S.sub q → S.M p q + S.N p q = H * A p q + E p q) (p q : Fin n) :
     S.X p q = S.F p q + S.M p q + S.N p q + H ^ 2 * (A * S.early (S.sub p) * A) p q +
       H * (E * S.early (S.sub p) * A) p q + (S.N * (S.X - 1 - H • A)) p q := by
-  have hrow : ∀ r, S.N p r =
-      (if S.stage (S.sub r) < S.stage (S.sub p) then 1 else 0) * (H * A p r + E p r) := by
-    intro r
-    by_cases hr : S.stage (S.sub r) < S.stage (S.sub p)
-    · have hpr : S.sub p ≠ S.sub r := fun h => by
-        rw [h] at hr
-        exact lt_irrefl _ hr
-      have hM0 : S.M p r = 0 := S.hM p r (fun h => h.2 hr)
-      simp only [hr, ↓reduceIte, one_mul]
-      rw [← hE p r hpr, hM0, zero_add]
-    · simp only [hr, ↓reduceIte, zero_mul]
-      exact S.hN p r (fun h => hr h.2)
   have hNA : (S.N * A) p q =
       H * (A * S.early (S.sub p) * A) p q + (E * S.early (S.sub p) * A) p q := by
     rw [Matrix.mul_apply]
     simp only [early, mul_diagonal_mul_apply, Finset.mul_sum, ← Finset.sum_add_distrib]
     refine Finset.sum_congr rfl fun r _ => ?_
-    rw [hrow r]
+    rw [S.N_apply_eq_ite hE p r]
     ring
   have hNX : S.N * S.X = S.N + H • (S.N * A) + S.N * (S.X - 1 - H • A) := by
     rw [Matrix.mul_sub, Matrix.mul_sub, Matrix.mul_one, Matrix.mul_smul]
@@ -198,18 +174,11 @@ theorem norm_rem_le {A U E : Matrix (Fin n) (Fin n) ℝ} {H a c d : ℝ} (hH : 0
     (hc : ‖opE (S.X - U)‖ ≤ c * H ^ 2) (hd : ‖opE E‖ ≤ d * H ^ 2) (s : κ) :
     ‖opE (S.rem A E U H s)‖ ≤ reactionConst a c d ‖opE A‖ H * H ^ 3 := by
   have haH : 0 ≤ a * H := le_trans (norm_nonneg _) ha
-  have hdH : 0 ≤ d * H ^ 2 := le_trans (norm_nonneg _) hd
   have hR : ‖opE (U - (1 + H • A + (H ^ 2 / 2) • (A * A)))‖ ≤
       ‖opE A‖ ^ 3 / 6 * Real.exp (H * ‖opE A‖) * H ^ 3 := by
     rw [hU]
     exact norm_opE_exp_sub_quadratic_le A hH
-  have h1 : ‖opE (H • (E * S.early s * A))‖ ≤ H * (d * H ^ 2 * 1 * ‖opE A‖) := by
-    rw [opE_smul, norm_smul, Real.norm_of_nonneg hH, opE_mul, opE_mul]
-    refine mul_le_mul_of_nonneg_left ?_ hH
-    refine (norm_mul_le _ _).trans ?_
-    refine mul_le_mul_of_nonneg_right ?_ (norm_nonneg _)
-    refine (norm_mul_le _ _).trans ?_
-    exact mul_le_mul hd (S.norm_opE_early_le s) (norm_nonneg _) hdH
+  have h1 := S.norm_opE_smul_mul_early_mul_le hH hd A s
   have hXA : ‖opE (S.X - 1 - H • A)‖ ≤
       c * H ^ 2 + ‖opE A‖ ^ 2 / 2 * Real.exp (H * ‖opE A‖) * H ^ 2 := by
     have e : S.X - 1 - H • A = (S.X - U) + (U - (1 + H • A)) := by abel
@@ -320,9 +289,7 @@ theorem Consistent.forced_block' {A U : Matrix (Fin n) (Fin n) ℝ} {H a b c : �
   have h1 := h.reaction_block hnp hx hy
   have h0 : ⟪x, opE (S.F - 1 - H • A) y⟫ = 0 := by
     refine inner_opE_eq_zero hx hy fun p q hp hq => ?_
-    have hne : S.sub p ≠ S.sub q := by rw [hp, hq]; exact hst
-    have hnp' : ¬ S.partner (S.sub p) (S.sub q) := by rw [hp, hq]; exact hnp
-    have hpq : p ≠ q := fun e => hne (e ▸ rfl)
+    obtain ⟨hne, hnp', hpq⟩ := S.sub_ne_of_eq hst hnp hp hq
     rw [Matrix.sub_apply, Matrix.sub_apply, Matrix.smul_apply, S.hF p q hne,
       Matrix.one_apply_ne hpq, h.hA p q hne hnp', smul_zero, sub_zero, sub_zero]
   rwa [h0, sub_zero] at h1

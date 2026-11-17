@@ -65,6 +65,14 @@ noncomputable def ddGamma (x : Fin l → ℝ) (W : Matrix (Fin l) (Fin l) ℝ) :
 
 variable {x : Fin l → ℝ} {W : Matrix (Fin l) (Fin l) ℝ}
 
+/-- The columns of `W` are dual to the powers at the nodes: `Σ_p x_q^p W p q' = δ_{qq'}`. -/
+theorem sum_pow_mul_eq (hW : W * Matrix.vandermonde x = 1) (q q' : Fin l) :
+    ∑ p : Fin l, x q ^ (p : ℕ) * W p q' = if q = q' then 1 else 0 := by
+  have hV : Matrix.vandermonde x * W = 1 := mul_eq_one_comm.1 hW
+  have h2 := congrFun (congrFun hV q) q'
+  rw [Matrix.mul_apply, Matrix.one_apply] at h2
+  exact h2
+
 /-- The rows of `W` are dual to the powers at the nodes: `Σ_q W p q x_q^n = δ_{pn}`, `n < l`. -/
 theorem sum_mul_pow_eq (hW : W * Matrix.vandermonde x = 1) (p n : Fin l) :
     ∑ q, W p q * x q ^ (n : ℕ) = if p = n then 1 else 0 := by
@@ -194,6 +202,23 @@ theorem norm_pow_apply_le (A : E →L[ℝ] E) (n : ℕ) (v : E) : ‖(A ^ n) v�
     rw [h, pow_succ', mul_assoc]
     exact (A.le_opNorm _).trans (mul_le_mul_of_nonneg_left ih (norm_nonneg A))
 
+/-- The flow at a node is a combination of the combinations `ddComb`:
+`exp (x_q H A) v = Σ_p x_q^p ddComb p v`. -/
+theorem exp_node_apply_eq_sum (hW : W * Matrix.vandermonde x = 1) (A : E →L[ℝ] E) (H : ℝ)
+    (q : Fin l) (v : E) :
+    exp ((x q * H) • A) v = ∑ p : Fin l, x q ^ (p : ℕ) • ddComb A H x W p v := by
+  calc exp ((x q * H) • A) v
+      = ∑ q' : Fin l, (if q = q' then (1 : ℝ) else 0) • exp ((x q' * H) • A) v := by simp
+    _ = ∑ q' : Fin l, (∑ p : Fin l, x q ^ (p : ℕ) * W p q') • exp ((x q' * H) • A) v :=
+        sum_congr rfl fun q' _ => by rw [sum_pow_mul_eq hW]
+    _ = ∑ p : Fin l, ∑ q' : Fin l, (x q ^ (p : ℕ) * W p q') • exp ((x q' * H) • A) v := by
+        rw [sum_comm]
+        exact sum_congr rfl fun q' _ => by rw [sum_smul]
+    _ = ∑ p : Fin l, x q ^ (p : ℕ) • ddComb A H x W p v :=
+        sum_congr rfl fun p _ => by
+          rw [ddComb_apply, smul_sum]
+          exact sum_congr rfl fun q' _ => by rw [smul_smul]
+
 /-- **The samples and their combinations have the same common kernel:** `C U^{x_q} v = 0` for
 all `q < l` iff `C (Σ_q W p q U^{x_q} v) = 0` for all `p < l`. -/
 theorem forall_ddComb_eq_zero_iff (hW : W * Matrix.vandermonde x = 1) (C : E →L[ℝ] Y)
@@ -201,25 +226,7 @@ theorem forall_ddComb_eq_zero_iff (hW : W * Matrix.vandermonde x = 1) (C : E →
     (∀ p, C (ddComb A H x W p v) = 0) ↔ ∀ q, C (exp ((x q * H) • A) v) = 0 := by
   constructor
   · intro h q
-    have hV : Matrix.vandermonde x * W = 1 := mul_eq_one_comm.1 hW
-    have h1 : ∀ q' : Fin l, ∑ p : Fin l, x q ^ (p : ℕ) * W p q' = if q = q' then 1 else 0 :=
-      fun q' => by
-        have h2 := congrFun (congrFun hV q) q'
-        rw [Matrix.mul_apply, Matrix.one_apply] at h2
-        exact h2
-    have h3 : exp ((x q * H) • A) v = ∑ p : Fin l, x q ^ (p : ℕ) • ddComb A H x W p v := by
-      calc exp ((x q * H) • A) v
-          = ∑ q' : Fin l, (if q = q' then (1 : ℝ) else 0) • exp ((x q' * H) • A) v := by simp
-        _ = ∑ q' : Fin l, (∑ p : Fin l, x q ^ (p : ℕ) * W p q') • exp ((x q' * H) • A) v :=
-            sum_congr rfl fun q' _ => by rw [h1]
-        _ = ∑ p : Fin l, ∑ q' : Fin l, (x q ^ (p : ℕ) * W p q') • exp ((x q' * H) • A) v := by
-            rw [sum_comm]
-            exact sum_congr rfl fun q' _ => by rw [sum_smul]
-        _ = ∑ p : Fin l, x q ^ (p : ℕ) • ddComb A H x W p v :=
-            sum_congr rfl fun p _ => by
-              rw [ddComb_apply, smul_sum]
-              exact sum_congr rfl fun q' _ => by rw [smul_smul]
-    rw [h3, map_sum]
+    rw [exp_node_apply_eq_sum hW, map_sum]
     exact sum_eq_zero fun p _ => by rw [map_smul, h p, smul_zero]
   · intro h p
     rw [ddComb_apply, map_sum]

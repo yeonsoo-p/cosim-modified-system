@@ -36,8 +36,8 @@ because the polynomial has a constant term when `0 ∉ S`; Step 1 holds for `m =
 
 **Instances.**
 * Ages `0, …, l-1` (`leadNodes l`): `nodeDefect = localDefect`, `γ_S = adamsGamma l`, and the
-  constants are those of `MemoryLead.lean`; `memory_lead_of_nodes` is the statement of
-  `memory_lead`, derived from `memory_nodes`.
+  constants `b`, `C_1`, `C_2` are those of `MemoryLead.lean` (`nodeB_leadNodes`,
+  `nodeC1_leadNodes`, `nodeC2_leadNodes`).
 * Ages `-1, 0, …, l-2` (`lateNodes l`), a subsystem that runs after all of its partners
   (`memory_late`): with `𝒯 = P U - Fi P - gNew C U - Σ_{r<l-1} g r C U^{-r}` (`lateDefect`),
   `‖gNew ∘ C‖ ≤ w H` and `‖g r ∘ C‖ ≤ w H` for `1 ≤ r < l-1`, for every `l ≥ 1`,
@@ -129,19 +129,8 @@ theorem exists_node_sample_apply_eq (T : G →L[ℝ] F) {H : ℝ} (hH : 0 ≤ H)
     (hv : v ∈ unseen P C A m) (r : ℤ) :
     ∃ ρ : F, T (C (exp ((-((r : ℝ) * H)) • A) v)) =
         (H ^ m * ((-(r : ℝ)) ^ m / (m ! : ℝ))) • T (C ((A ^ m) v)) + ρ ∧
-      ‖ρ‖ ≤ ‖T ∘L C‖ * (expTail (m + 1) (|(r : ℝ)| * (H * ‖A‖)) * ‖v‖) := by
-  obtain ⟨ρ, h1, h2⟩ := exists_exp_smul_apply_eq A (-((r : ℝ) * H)) (b := m + 1) (by omega) v
-  rw [abs_neg, abs_mul, abs_of_nonneg hH, mul_assoc] at h2
-  obtain ⟨-, hC⟩ := mem_unseen.1 hv
-  refine ⟨(T ∘L C) ρ, ?_, ?_⟩
-  · change (T ∘L C) (exp ((-((r : ℝ) * H)) • A) v) = _
-    rw [h1, map_add, map_sum, sum_range_succ, sum_eq_zero, zero_add, map_smul,
-      ContinuousLinearMap.comp_apply]
-    · congr 2
-      ring
-    · intro n hn
-      rw [map_smul, ContinuousLinearMap.comp_apply, hC n (mem_range.1 hn), map_zero, smul_zero]
-  · exact ((T ∘L C).le_opNorm ρ).trans (mul_le_mul_of_nonneg_left h2 (norm_nonneg _))
+      ‖ρ‖ ≤ ‖T ∘L C‖ * (expTail (m + 1) (|(r : ℝ)| * (H * ‖A‖)) * ‖v‖) :=
+  exists_age_sample_apply_eq T hH hv r
 
 /-- The local defect of a rule that uses the samples of the ages `r ∈ S` (the sample of the age
 `r` is `C U^{-r}`; `r = -1` is the new sample): `𝒯 = P U - Fi P - Σ_{r ∈ S} g r C U^{-r}`,
@@ -159,41 +148,9 @@ theorem node_key_step (hA : P ∘L A = Ai ∘L P + L ∘L C) (hP : ‖P‖ ≤ 1
     (hv : v ∈ unseen P C A m) :
     ‖H ^ m • nodeMoment g C S m ((A ^ m) v) -
         (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (m + 1)) v)‖ ≤
-      (‖nodeDefect P Fi g C A H S‖ + nodeE S m w H (H * ‖A‖)) * ‖v‖ := by
-  obtain ⟨ρ0, h0, hρ0⟩ := exists_proj_exp_apply_eq hA hP hH hv
-  choose ρ h1 hρ using fun r => exists_node_sample_apply_eq (g r) hH hv r
-  obtain ⟨hPv, -⟩ := mem_unseen.1 hv
-  have hT : nodeDefect P Fi g C A H S v =
-      (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (m + 1)) v) + ρ0 -
-        H ^ m • nodeMoment g C S m ((A ^ m) v) - ∑ r ∈ S, ρ r := by
-    unfold nodeDefect nodeMoment
-    simp only [_root_.sub_apply, _root_.sum_apply, ContinuousLinearMap.comp_apply]
-    rw [h0, hPv, map_zero, sub_zero, sum_congr rfl fun r _ => h1 r, sum_add_distrib, smul_sum]
-    simp only [smul_smul]
-    abel
-  have hkey : H ^ m • nodeMoment g C S m ((A ^ m) v) -
-      (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (m + 1)) v) =
-      ρ0 - nodeDefect P Fi g C A H S v - ∑ r ∈ S, ρ r := by
-    rw [hT]
-    abel
-  rw [hkey]
-  have hsum : ‖∑ r ∈ S, ρ r‖ ≤
-      ∑ r ∈ S, w * H * (expTail (m + 1) (|(r : ℝ)| * (H * ‖A‖)) * ‖v‖) := by
-    refine norm_sum_le_of_le _ fun r hr => (hρ r).trans ?_
-    rcases eq_or_ne r 0 with rfl | hr0
-    · simp [expTail_zero]
-    · exact mul_le_mul_of_nonneg_right (hw r hr hr0)
-        (mul_nonneg (expTail_nonneg _ (by positivity)) (norm_nonneg _))
-  have h5 : ∑ r ∈ S, w * H * (expTail (m + 1) (|(r : ℝ)| * (H * ‖A‖)) * ‖v‖) =
-      w * H * (∑ r ∈ S, expTail (m + 1) (|(r : ℝ)| * (H * ‖A‖))) * ‖v‖ := by
-    rw [mul_sum, sum_mul]
-    exact sum_congr rfl fun r _ => by ring
-  have hTv := (nodeDefect P Fi g C A H S).le_opNorm v
-  have h3 := norm_sub_le (ρ0 - nodeDefect P Fi g C A H S v) (∑ r ∈ S, ρ r)
-  have h4 := norm_sub_le ρ0 (nodeDefect P Fi g C A H S v)
-  unfold nodeE
-  rw [h5] at hsum
-  linarith
+      (‖nodeDefect P Fi g C A H S‖ + nodeE S m w H (H * ‖A‖)) * ‖v‖ :=
+  age_key_step hA hP Fi S (fun r : ℤ => (r : ℝ)) g hH
+    (fun r hr h0 => hw r hr (Int.cast_ne_zero.1 h0)) hv
 
 end NodeTaylor
 
@@ -221,36 +178,10 @@ theorem node_bounded_apply (hA : P ∘L A = Ai ∘L P + L ∘L C) (hP : ‖P‖ 
   have hkm : ∀ m ∈ range l,
       ‖H ^ l • nodeMoment g C S m ((A ^ l) v) -
         (H ^ (l + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v)‖ ≤
-      (H * ‖A‖) ^ (l - m) * (‖nodeDefect P Fi g C A H S‖ + nodeE S m w H (H * ‖A‖)) * ‖v‖ := by
-    intro m hm
-    have hml := mem_range.1 hm
-    have hv' : (A ^ (l - m)) v ∈ unseen P C A m :=
-      pow_mem_unseen hA (l - m) (by rwa [Nat.add_sub_cancel' hml.le])
-    have h := node_key_step hA hP Fi g hH hw hv'
-    rw [← pow_add_apply', ← pow_add_apply', Nat.add_sub_cancel' hml.le,
-      (by omega : m + 1 + (l - m) = l + 1)] at h
-    have he : H ^ l • nodeMoment g C S m ((A ^ l) v) -
-        (H ^ (l + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v) =
-        H ^ (l - m) • (H ^ m • nodeMoment g C S m ((A ^ l) v) -
-          (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v)) := by
-      have e1 : H ^ (l - m) * H ^ m = H ^ l := by rw [← pow_add, Nat.sub_add_cancel hml.le]
-      have e2 : H ^ (l - m) * (H ^ (m + 1) / ((m + 1)! : ℝ)) = H ^ (l + 1) / ((m + 1)! : ℝ) := by
-        rw [← mul_div_assoc, ← pow_add, (by omega : l - m + (m + 1) = l + 1)]
-      rw [smul_sub, smul_smul, smul_smul, e1, e2]
-    have hvn : ‖(A ^ (l - m)) v‖ ≤ ‖A‖ ^ (l - m) * ‖v‖ :=
-      ((A ^ (l - m)).le_opNorm v).trans
-        (mul_le_mul_of_nonneg_right (norm_pow_le' A (by omega)) (norm_nonneg v))
-    rw [he, norm_smul, Real.norm_of_nonneg (pow_nonneg hH _)]
-    calc H ^ (l - m) * ‖H ^ m • nodeMoment g C S m ((A ^ l) v) -
-          (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v)‖
-        ≤ H ^ (l - m) * ((‖nodeDefect P Fi g C A H S‖ + nodeE S m w H (H * ‖A‖)) *
-            (‖A‖ ^ (l - m) * ‖v‖)) :=
-          mul_le_mul_of_nonneg_left (h.trans (mul_le_mul_of_nonneg_left hvn
-            (add_nonneg ht0 (nodeE_nonneg S m hw0 hH hx0)))) (pow_nonneg hH _)
-      _ = (H * ‖A‖) ^ (l - m) * (‖nodeDefect P Fi g C A H S‖ + nodeE S m w H (H * ‖A‖)) *
-            ‖v‖ := by
-          rw [mul_pow]
-          ring
+      (H * ‖A‖) ^ (l - m) * (‖nodeDefect P Fi g C A H S‖ + nodeE S m w H (H * ‖A‖)) * ‖v‖ :=
+    fun m hm => key_step_shift hA hH (mem_range.1 hm) (nodeMoment g C S m)
+      (add_nonneg ht0 (nodeE_nonneg S m hw0 hH hx0))
+      (fun _ hu => node_key_step hA hP Fi g hH hw hu) hv
   have hid := node_gamma_identity g C hS H ((A ^ l) v) (P ((A ^ (l + 1)) v))
   have hβ : ∀ m, |nodeCoeff S m * (m ! : ℝ) / (l ! : ℝ)| = nodeBeta S m := by
     intro m
@@ -314,49 +245,13 @@ theorem memory_nodes_apply (hA : P ∘L A = Ai ∘L P + L ∘L C) (hP : ‖P‖ 
       ((1 + nodeB S * (H * ‖A‖)) * ‖nodeDefect P Fi g C A H S‖ +
         (nodeC1 S * ‖A‖ ^ (l + 2) + nodeC2 S * w * ‖A‖ ^ (l + 1)) * H ^ (l + 2)) * ‖v‖ := by
   have hx0 : 0 ≤ H * ‖A‖ := mul_nonneg hH (norm_nonneg A)
-  have ht0 : 0 ≤ ‖nodeDefect P Fi g C A H S‖ := norm_nonneg _
   refine (node_bounded_apply hA hP Fi g hH hw0 hS hw hv).trans
     (mul_le_mul_of_nonneg_right ?_ (norm_nonneg v))
-  -- (a) the factor of the defect
-  have ha : ∑ m ∈ range l, nodeBeta S m * (H * ‖A‖) ^ (l - m) ≤ nodeB S * (H * ‖A‖) := by
-    unfold nodeB
-    rw [hS, sum_mul]
-    refine sum_le_sum fun m hm => mul_le_mul_of_nonneg_left ?_ (nodeBeta_nonneg S m)
-    have h := pow_le_pow_of_le_one hx0 hx1 (by have := mem_range.1 hm; omega : 1 ≤ l - m)
-    rwa [pow_one] at h
-  -- (b) the remainders
-  have hb : ∑ m ∈ range l, nodeBeta S m * (H * ‖A‖) ^ (l - m) * nodeE S m w H (H * ‖A‖) ≤
-      ∑ m ∈ range l, (nodeBeta S m * expTail (m + 2) 1 * (H * ‖A‖) ^ (l + 2) +
-        nodeBeta S m * (∑ r ∈ S, expTail (m + 1) |(r : ℝ)|) *
-          (w * H * (H * ‖A‖) ^ (l + 1))) := by
-    refine sum_le_sum fun m hm => ?_
-    have hml := mem_range.1 hm
-    have h := mul_le_mul_of_nonneg_left (nodeE_le S m hw0 hH hx0 hx1)
-      (mul_nonneg (nodeBeta_nonneg S m) (pow_nonneg hx0 (l - m)))
-    refine h.trans (le_of_eq ?_)
-    have e1 : (H * ‖A‖) ^ (l - m) * (H * ‖A‖) ^ (m + 2) = (H * ‖A‖) ^ (l + 2) := by
-      rw [← pow_add, (by omega : l - m + (m + 2) = l + 2)]
-    have e2 : (H * ‖A‖) ^ (l - m) * (H * ‖A‖) ^ (m + 1) = (H * ‖A‖) ^ (l + 1) := by
-      rw [← pow_add, (by omega : l - m + (m + 1) = l + 1)]
-    rw [← e1, ← e2]
-    ring
-  have hc := nodeE_le S l hw0 hH hx0 hx1
-  rw [sum_add_distrib, ← sum_mul, ← sum_mul] at hb
-  have hmul := mul_le_mul_of_nonneg_right ha ht0
-  unfold nodeC1 nodeC2
-  rw [hS]
-  have e3 : (H * ‖A‖) ^ (l + 2) = ‖A‖ ^ (l + 2) * H ^ (l + 2) := by rw [mul_pow, mul_comm]
-  have e4 : w * H * (H * ‖A‖) ^ (l + 1) = w * ‖A‖ ^ (l + 1) * H ^ (l + 2) := by
-    rw [mul_pow]
-    ring
-  rw [e3, e4] at hb
-  rw [e3] at hc
-  have e5 : w * H * (∑ r ∈ S, expTail (l + 1) |(r : ℝ)|) * (H * ‖A‖) ^ (l + 1) =
-      (∑ r ∈ S, expTail (l + 1) |(r : ℝ)|) * (w * ‖A‖ ^ (l + 1) * H ^ (l + 2)) := by
-    rw [mul_pow]
-    ring
-  rw [e5] at hc
-  nlinarith [hb, hc, hmul]
+  subst hS
+  exact lead_of_bounded_arith (range S.card) (fun m hm => mem_range.1 hm) (nodeBeta S)
+    (fun m => nodeE S m w H (H * ‖A‖)) (fun m => expTail (m + 2) 1)
+    (fun m => ∑ r ∈ S, expTail (m + 1) |(r : ℝ)|) (nodeBeta_nonneg S) hx0 hx1 (norm_nonneg _)
+    fun m => nodeE_le S m hw0 hH hx0 hx1
 
 /-- **One order per held sample for any set of sample ages.** Let subsystem `i` (projection `P`,
 `‖P‖ ≤ 1`, `P ∘ A = Ai ∘ P + L ∘ C`) use the samples of the ages `r ∈ S`, a set of `l` integers
@@ -392,12 +287,6 @@ variable {E F G : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpa
   [NormedAddCommGroup F] [NormedSpace ℝ F] [NormedAddCommGroup G] [NormedSpace ℝ G]
   {P : E →L[ℝ] F} {C : E →L[ℝ] G} {A : E →L[ℝ] E} {Ai : F →L[ℝ] F} {L : G →L[ℝ] F}
 
-/-- The sample of the age `r ∈ ℕ` in the two notations: `U^{-r} = exp (-(r H) • A)`. -/
-theorem exp_neg_smul_pow (A : E →L[ℝ] E) (H : ℝ) (r : ℕ) :
-    exp (-(H • A)) ^ r = exp ((-((r : ℝ) * H)) • A) := by
-  let _ : NormedAlgebra ℚ (E →L[ℝ] E) := NormedAlgebra.restrictScalars ℚ ℝ (E →L[ℝ] E)
-  rw [← exp_nsmul, ← Nat.cast_smul_eq_nsmul ℝ, smul_neg, smul_smul, neg_smul]
-
 /-- For the ages `0, …, l-1` the local defect is that of `MemoryLead.lean`. -/
 theorem nodeDefect_leadNodes (P : E →L[ℝ] F) (Fi : F →L[ℝ] F) (g : ℕ → G →L[ℝ] F)
     (C : E →L[ℝ] G) (A : E →L[ℝ] E) (H : ℝ) (l : ℕ) :
@@ -426,30 +315,6 @@ theorem nodeC2_leadNodes {l : ℕ} (hl : 1 ≤ l) : nodeC2 (leadNodes l) = memC2
   unfold nodeC2 memC2 nodeBeta memBeta
   rw [card_leadNodes, range_eq_Ico, sum_eq_sum_Ico_succ_bot (by omega : 0 < l)]
   simp [nodeCoeff_leadNodes, adamsCoeff_zero hl, sum_leadNodes]
-
-/-- **Theorem 4.10 as an instance of `memory_nodes`** (ages `0, …, l-1`): the statement of
-`memory_lead`, derived from the theorem for general ages. -/
-theorem memory_lead_of_nodes (hA : P ∘L A = Ai ∘L P + L ∘L C) (hP : ‖P‖ ≤ 1) (Fi : F →L[ℝ] F)
-    (g : ℕ → G →L[ℝ] F) {H w : ℝ} (hH : 0 ≤ H) (hw0 : 0 ≤ w) (hx1 : H * ‖A‖ ≤ 1) {l : ℕ}
-    (hl : 1 ≤ l) (hw : ∀ r, 1 ≤ r → r < l → ‖g r ∘L C‖ ≤ w * H) :
-    adamsGamma l * ‖(P ∘L (A ^ (l + 1))) ∘L (unseen P C A l).subtypeL‖ * H ^ (l + 1) -
-        (memC1 l * ‖A‖ ^ (l + 2) + memC2 l * w * ‖A‖ ^ (l + 1)) * H ^ (l + 2) ≤
-      (1 + memB l * (H * ‖A‖)) * ‖localDefect P Fi g C A H l‖ := by
-  have hw' : ∀ r ∈ leadNodes l, r ≠ 0 → ‖(fun r : ℤ => g r.toNat) r ∘L C‖ ≤ w * H := by
-    intro r hr hr0
-    obtain ⟨k, hk, rfl⟩ := mem_map.1 hr
-    have hk0 : k ≠ 0 := by
-      rintro rfl
-      exact hr0 rfl
-    have h := hw k (by omega) (mem_range.1 hk)
-    simpa using h
-  have h := memory_nodes hA hP Fi (fun r : ℤ => g r.toNat) hH hw0 hx1 (card_leadNodes l) hw'
-  rw [nodeDefect_leadNodes, nodeGamma_leadNodes, nodeB_leadNodes hl, nodeC1_leadNodes hl,
-    nodeC2_leadNodes hl] at h
-  have hc : 0 ≤ ‖(P ∘L (A ^ (l + 1))) ∘L (unseen P C A l).subtypeL‖ * H ^ (l + 1) :=
-    by positivity
-  have habs := mul_le_mul_of_nonneg_right (le_abs_self (adamsGamma l)) hc
-  linarith
 
 end Lead
 
@@ -614,6 +479,12 @@ variable {E F G : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpa
   [NormedAddCommGroup F] [NormedSpace ℝ F] [NormedAddCommGroup G] [NormedSpace ℝ G]
   {P : E →L[ℝ] F} {C : E →L[ℝ] G} {Ai : F →L[ℝ] F} {L : G →L[ℝ] F}
 
+/-- The oldest sample is not used: if its coefficient `g n` is zero, the sum of the samples of
+the ages `0, …, n` is the sum over the ages `0, …, n - 1`. -/
+theorem sum_range_succ_of_last_eq_zero (g : ℕ → G →L[ℝ] F) {n : ℕ} (hlast : g n = 0)
+    (y : ℕ → G) : ∑ r ∈ range (n + 1), g r (y r) = ∑ r ∈ range n, g r (y r) := by
+  rw [sum_range_succ, hlast, _root_.zero_apply, add_zero]
+
 /-- The block row of a subsystem that runs after all of its partners: if the row of subsystem
 `i` in the scheme `(1 - N) x^{k+1} = Σ_{r<l} M r x^{k-r}` is `P ∘ N = gNew ∘ C` (new samples),
 `P ∘ M 0 = Fi ∘ P + g 0 ∘ C`, `P ∘ M r = g r ∘ C` for `1 ≤ r < l`, and the oldest sample is not
@@ -626,15 +497,10 @@ theorem proj_comp_runDefect_late (A N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] 
       lateDefect P Fi gNew g C A H l := by
   obtain ⟨n, rfl⟩ : ∃ n, l = n + 1 := ⟨l - 1, by omega⟩
   rw [Nat.add_sub_cancel] at hlast
-  have hN' : ∀ y, P (N y) = gNew (C y) := fun y => by
-    have h := congrArg (fun T : E →L[ℝ] F => T y) hrowN
-    simpa using h
-  have h0' : ∀ y, P (M 0 y) = Fi (P y) + g 0 (C y) := fun y => by
-    have h := congrArg (fun T : E →L[ℝ] F => T y) hrow0
-    simpa using h
-  have hr' : ∀ r, 1 ≤ r → r < n + 1 → ∀ y, P (M r y) = g r (C y) := fun r h1 h2 y => by
-    have h := congrArg (fun T : E →L[ℝ] F => T y) (hrow r h1 h2)
-    simpa using h
+  have hN' : ∀ y, P (N y) = gNew (C y) := fun y => DFunLike.congr_fun hrowN y
+  have h0' : ∀ y, P (M 0 y) = Fi (P y) + g 0 (C y) := fun y => DFunLike.congr_fun hrow0 y
+  have hr' : ∀ r, 1 ≤ r → r < n + 1 → ∀ y, P (M r y) = g r (C y) := fun r h1 h2 y =>
+    DFunLike.congr_fun (hrow r h1 h2) y
   ext v
   have hsum : ∑ r ∈ range (n + 1), P (M r ((exp (-(H • A)) ^ r) v)) =
       Fi (P v) + ∑ r ∈ range (n + 1), g r (C ((exp (-(H • A)) ^ r) v)) := by
@@ -645,14 +511,10 @@ theorem proj_comp_runDefect_late (A N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] 
     rw [sum_congr rfl hs]
     simp only [pow_zero, one_apply_eq_self]
     abel
-  have hsum2 : ∑ r ∈ range (n + 1), g r (C ((exp (-(H • A)) ^ r) v)) =
-      ∑ r ∈ range n, g r (C ((exp (-(H • A)) ^ r) v)) := by
-    rw [sum_range_succ, hlast]
-    simp
   unfold lateDefect
   simp only [ContinuousLinearMap.comp_apply, _root_.sub_apply, _root_.sum_apply,
     mul_apply_eq_comp, one_apply_eq_self, map_sub, map_sum, hN', Nat.add_sub_cancel]
-  rw [hsum, hsum2]
+  rw [hsum, sum_range_succ_of_last_eq_zero g hlast]
   abel
 
 variable [Nontrivial E]
@@ -672,16 +534,9 @@ theorem run_order_barrier_of_le (A N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] E
       (2.65 * (1 + ν) + mbar * ((l : ℝ) * (l - 1)) *
         (1 + 1 / 4 * Real.exp (((l : ℝ) - 1) * (H * ‖A‖))))) ≤ δ := by
   refine le_trans (min_le_min le_rfl ?_) (run_order_barrier A N M hH hl hK hKH hN hM x hx hδ)
-  have hlK : (l : ℝ) ≤ K := by exact_mod_cast hK
-  have hl1 : (1 : ℝ) ≤ l := by exact_mod_cast hl
+  have hK' := run_length_pos hK
   have hν : 0 ≤ ν := (norm_nonneg N).trans hN
-  have hm : 0 ≤ mbar * ((l : ℝ) * (l - 1)) := by
-    rcases Nat.lt_or_ge 1 l with h | h
-    · exact mul_nonneg ((norm_nonneg _).trans (hM 1 le_rfl h))
-        (mul_nonneg (by linarith) (by linarith))
-    · have h1 : l = 1 := by omega
-      rw [h1]
-      simp
+  have hm := bound_mul_pred_nonneg hl hM
   have hD : 0 ≤ 2.65 * (1 + ν) + mbar * ((l : ℝ) * (l - 1)) *
       (1 + 1 / 4 * Real.exp (((l : ℝ) - 1) * (H * ‖A‖))) := by
     have he := Real.exp_pos (((l : ℝ) - 1) * (H * ‖A‖))
@@ -689,7 +544,7 @@ theorem run_order_barrier_of_le (A N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] E
         (1 + 1 / 4 * Real.exp (((l : ℝ) - 1) * (H * ‖A‖))) := mul_nonneg hm (by linarith)
     linarith
   exact div_le_div_of_nonneg_right
-    (mul_le_mul_of_nonneg_left ht0 (mul_nonneg (by norm_num) (by linarith))) hD
+    (mul_le_mul_of_nonneg_left ht0 (mul_nonneg (by norm_num) hK'.le)) hD
 
 /-- **Order over a run for a scheme in which a subsystem runs after all of its partners.** In the
 setting of `run_order_barrier` (scheme `(1 - N) x^{k+1} = Σ_{r<l} M r x^{k-r}` with `l` held

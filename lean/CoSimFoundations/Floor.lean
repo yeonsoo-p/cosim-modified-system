@@ -55,4 +55,11 @@ theorem link_floor_opNorm (D U : E →L[ℝ] E) {e f : E} (he : ‖e‖ = 1) (hf
   have : ‖U f‖ ≤ ‖U‖ := by simpa [hf] using U.le_opNorm f
   gcongr
 
+/-- The sum and the difference of two orthonormal vectors have squared norm `2`. -/
+theorem norm_add_sq_of_orthonormal {e₁ e₂ : E} (h1 : ‖e₁‖ = 1) (h2 : ‖e₂‖ = 1)
+    (h12 : ⟪e₁, e₂⟫ = 0) : ‖e₁ + e₂‖ ^ 2 = 2 ∧ ‖e₁ - e₂‖ ^ 2 = 2 := by
+  constructor
+  · rw [norm_add_sq_real, h1, h2, h12]; norm_num
+  · rw [norm_sub_sq_real, h1, h2, h12]; norm_num
+
 end CoSimFoundations

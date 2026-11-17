@@ -114,6 +114,12 @@ theorem inner_osgn (s : κ) (u w : EuclideanSpace ℝ (Fin n)) :
       ∑ r, (if S.sub r = s then 0 else S.sg s (S.sub r)) * u r * w r :=
   inner_opE_diagonal _ u w
 
+/-- The form of `osgn s` is symmetric: `⟪w, osgn_s u⟫ = ⟪u, osgn_s w⟫`. -/
+theorem inner_osgn_comm (s : κ) (u w : EuclideanSpace ℝ (Fin n)) :
+    ⟪w, opE (S.osgn s) u⟫ = ⟪u, opE (S.osgn s) w⟫ := by
+  rw [S.inner_osgn, S.inner_osgn]
+  exact Finset.sum_congr rfl fun r _ => by ring
+
 omit [DecidableEq κ] in
 /-- If `A_{sk} = -A_{ks}ᵀ` between different subsystems, then `⟪x, A w⟫ = -⟪A x, w⟫` for `x`
 supported on a subsystem `s` and `w` vanishing on `s`. -/
@@ -121,20 +127,11 @@ theorem inner_opE_skew {A : Matrix (Fin n) (Fin n) ℝ}
     (hskew : ∀ p q, S.sub p ≠ S.sub q → A q p = -A p q) {s : κ}
     {x w : EuclideanSpace ℝ (Fin n)} (hx : ∀ p, S.sub p ≠ s → x p = 0)
     (hw : ∀ r, S.sub r = s → w r = 0) : ⟪x, opE A w⟫ = -⟪opE A x, w⟫ := by
-  rw [real_inner_comm w (opE A x), inner_opE_eq_sum, inner_opE_eq_sum, Finset.sum_comm,
-    ← Finset.sum_neg_distrib]
-  refine Finset.sum_congr rfl fun q _ => ?_
-  rw [← Finset.sum_neg_distrib]
-  refine Finset.sum_congr rfl fun p _ => ?_
-  by_cases hp : S.sub p = s
-  · by_cases hq : S.sub q = s
-    · rw [hw q hq]
-      ring
-    · have e : A q p = -A p q := hskew p q (by rw [hp]; exact fun e => hq e.symm)
-      rw [e]
-      ring
-  · rw [hx p hp]
-    ring
+  rw [real_inner_comm w (opE A x), inner_opE_transpose A x w, ← neg_one_mul, ← inner_opE_smul]
+  refine inner_opE_congr_of_ne_zero fun p q hp hq => ?_
+  have hps : S.sub p = s := not_imp_comm.1 (hx p) hp
+  have hqs : S.sub q ≠ S.sub p := fun e => hq (hw q (e.trans hps))
+  rw [Matrix.smul_apply, Matrix.transpose_apply, hskew q p hqs, smul_eq_mul, neg_one_mul]
 
 /-- With `A_{sk} = -A_{ks}ᵀ`: `⟪x, A osgn_s A y⟫ = -⟪A x, osgn_s (A y)⟫` for `x` supported on
 `s`, that is `Σ_k ς_{sk} A_{sk} A_{ks} = -Σ_k ς_{sk} A_{ks}ᵀ A_{ks}`. -/

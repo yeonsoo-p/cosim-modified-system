@@ -153,10 +153,7 @@ theorem lead_of_barrier {G R H Hl a t b ν mm Kp e lr δ : ℝ} (hlr : 1 ≤ lr)
     have h3 : 0 ≤ (1 + ν) * ((lr - 1) * (H * a)) :=
       mul_nonneg (by linarith) (mul_nonneg (by linarith) hx.le)
     nlinarith
-  have hKp0 : 0 ≤ Kp := by
-    by_contra h
-    have := mul_neg_of_neg_of_pos (not_le.1 h) hx
-    linarith
+  have hKp0 := run_length_nonneg_of_le hx hlx hKp
   have hδ0 : 0 ≤ δ :=
     le_trans (le_min (by norm_num)
       (div_nonneg (mul_nonneg (mul_nonneg (by norm_num) hKp0) ht) hD.le)) hbar
@@ -200,6 +197,20 @@ theorem lead_of_barrier {G R H Hl a t b ν mm Kp e lr δ : ℝ} (hlr : 1 ≤ lr)
       _ = 0.175 * Kp * t * ((212 / 7 * (1 + ν) + 100 / 7 * mm) * a) *
             ((1 + b * (H * a)) * H) := by ring
 
+/-- The number of steps of the interval `1/(2a)`: `K = ⌊1/(2a)/H⌋` has
+`K H a ≤ 1/2 < (K + 1) H a`. -/
+theorem horizon_floor {a H : ℝ} (ha : 0 < a) (hH : 0 < H) :
+    ((⌊1 / (2 * a) / H⌋₊ : ℕ) : ℝ) * H * a ≤ 1 / 2 ∧
+      1 / 2 < (((⌊1 / (2 * a) / H⌋₊ : ℕ) : ℝ) + 1) * H * a := by
+  have hy : 0 < 2 * a * H := by positivity
+  have he : 1 / (2 * a) / H * (2 * a * H) = 1 := by
+    field_simp
+  have h1 : ((⌊1 / (2 * a) / H⌋₊ : ℕ) : ℝ) * (2 * a * H) ≤ 1 :=
+    (mul_le_mul_of_nonneg_right (Nat.floor_le (by positivity)) hy.le).trans he.le
+  have h2 : 1 < (((⌊1 / (2 * a) / H⌋₊ : ℕ) : ℝ) + 1) * (2 * a * H) :=
+    he.symm.le.trans_lt (mul_lt_mul_of_pos_right (Nat.lt_floor_add_one _) hy)
+  constructor <;> linarith
+
 end Real
 
 section Operator
@@ -236,12 +247,10 @@ theorem proj_comp_runDefect (N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] E) (Fi 
     (hrow : ∀ r, 1 ≤ r → r < l → P ∘L M r = g r ∘L C) :
     P ∘L ((1 - N) * exp (H • A) - ∑ r ∈ range l, M r * exp (-(H • A)) ^ r) =
       localDefect P Fi g C A H l := by
-  have hN : ∀ y, P (N y) = 0 := fun y => by
-    simpa using congrArg (fun T : E →L[ℝ] F => T y) hrowN
-  have h0 : ∀ y, P (M 0 y) = Fi (P y) + g 0 (C y) := fun y => by
-    simpa using congrArg (fun T : E →L[ℝ] F => T y) hrow0
-  have hr : ∀ r, 1 ≤ r → r < l → ∀ y, P (M r y) = g r (C y) := fun r h1 h2 y => by
-    simpa using congrArg (fun T : E →L[ℝ] F => T y) (hrow r h1 h2)
+  have hN : ∀ y, P (N y) = 0 := fun y => DFunLike.congr_fun hrowN y
+  have h0 : ∀ y, P (M 0 y) = Fi (P y) + g 0 (C y) := fun y => DFunLike.congr_fun hrow0 y
+  have hr : ∀ r, 1 ≤ r → r < l → ∀ y, P (M r y) = g r (C y) := fun r h1 h2 y =>
+    DFunLike.congr_fun (hrow r h1 h2) y
   have hsum : ∀ v : E, ∑ r ∈ range l, P (M r ((exp (-(H • A)) ^ r) v)) =
       Fi (P v) + ∑ r ∈ range l, g r (C ((exp (-(H • A)) ^ r) v)) := by
     intro v
@@ -296,26 +305,10 @@ theorem run_order_lead (N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] E)
   have hA0 : 0 ≤ ‖A‖ := norm_nonneg A
   have hx0 : 0 ≤ H * ‖A‖ := mul_nonneg hH hA0
   have hl1 : (1 : ℝ) ≤ l := by exact_mod_cast hl
-  have hxpos : 0 < H * ‖A‖ := by
-    by_contra h
-    have h0 : H * ‖A‖ = 0 := le_antisymm (not_lt.1 h) hx0
-    rw [mul_assoc, h0, mul_zero] at hK1
-    norm_num at hK1
-  have hHpos : 0 < H := lt_of_le_of_ne hH fun h => by
-    rw [← h, zero_mul] at hxpos
-    exact lt_irrefl _ hxpos
-  have hApos : 0 < ‖A‖ := lt_of_le_of_ne hA0 fun h => by
-    rw [← h, mul_zero] at hxpos
-    exact lt_irrefl _ hxpos
+  obtain ⟨hHpos, hApos⟩ := pos_of_half_lt_horizon hH hA0 hK1
   have hlx' : (l : ℝ) * (H * ‖A‖) ≤ 1 / 2 := by linarith
-  have hxhalf : H * ‖A‖ ≤ 1 / 2 := by
-    have := mul_le_mul_of_nonneg_right hl1 hx0
-    linarith
-  have hK : l ≤ K := by
-    by_contra h
-    have h1 : (K : ℝ) + 1 ≤ l := by exact_mod_cast not_le.1 h
-    have h2 : ((K : ℝ) + 1) * (H * ‖A‖) ≤ l * (H * ‖A‖) := mul_le_mul_of_nonneg_right h1 hx0
-    linarith
+  have hxhalf : H * ‖A‖ ≤ 1 / 2 := le_half_of_two_mul_le hl hx0 hlx
+  have hK : l ≤ K := le_of_half_lt_horizon hx0 hlx hK1
   -- the bound over a run and the bound on the local defect
   have hbar := run_order_barrier A N M hH hl hK hKH hN hM x hx hδ
   have hrowT := proj_comp_runDefect (P := P) (C := C) (A := A) N M Fi g H hl hrowN hrow0 hrow
@@ -324,10 +317,7 @@ theorem run_order_lead (N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] E)
     rw [← hrowT]
     exact (ContinuousLinearMap.opNorm_comp_le _ _).trans
       (mul_le_of_le_one_left (norm_nonneg _) hP)
-  have hmem : adamsGamma l * unseenRate P C A l * H ^ (l + 1) -
-      (memC1 l * ‖A‖ ^ (l + 2) + memC2 l * w * ‖A‖ ^ (l + 1)) * H ^ (l + 2) ≤
-      (1 + memB l * (H * ‖A‖)) * ‖localDefect P Fi g C A H l‖ :=
-    memory_lead hA hP Fi g hH hw0 (by linarith) hl hw
+  have hmem := memory_lead hA hP Fi g hH hw0 (hxhalf.trans (by norm_num)) hl hw
   have hb0 := memB_nonneg l
   have hmem' : adamsGamma l * unseenRate P C A l * (H ^ l * H) -
       (memC1 l * ‖A‖ ^ (l + 2) + memC2 l * w * ‖A‖ ^ (l + 1)) * (H ^ l * H * H) ≤
@@ -340,18 +330,9 @@ theorem run_order_lead (N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] E)
   -- the constants
   have hG0 : 0 ≤ adamsGamma l * unseenRate P C A l :=
     mul_nonneg (adamsGamma_nonneg l) (unseenRate_nonneg P C A l)
-  have hR0 : 0 ≤ memC1 l * ‖A‖ ^ (l + 2) + memC2 l * w * ‖A‖ ^ (l + 1) := by
-    have h1 := memC1_nonneg l
-    have h2 := memC2_nonneg l
-    positivity
+  have hR0 := memRem_nonneg l hA0 hw0
   have hν0 : 0 ≤ ν := (norm_nonneg N).trans hN
-  have hmm : 0 ≤ mbar * ((l : ℝ) * (l - 1)) := by
-    rcases Nat.lt_or_ge 1 l with h2 | h2
-    · exact mul_nonneg ((norm_nonneg _).trans (hM 1 le_rfl h2))
-        (mul_nonneg (by linarith) (by linarith))
-    · have h1 : l = 1 := by omega
-      rw [h1]
-      simp
+  have hmm := bound_mul_pred_nonneg hl hM
   have hy0 : 0 ≤ ((l : ℝ) - 1) * (H * ‖A‖) := mul_nonneg (by linarith) hx0
   have he : Real.exp (((l : ℝ) - 1) * (H * ‖A‖)) ≤ 1 + 1.65 * (((l : ℝ) - 1) * (H * ‖A‖)) := by
     have h1 := exp_sub_one_le_mul_exp (((l : ℝ) - 1) * (H * ‖A‖))
@@ -401,28 +382,12 @@ theorem run_order_lead_floor (N : E →L[ℝ] E) (M : ℕ → E →L[ℝ] E)
           H ^ (l + 1)) /
       ((30.3 * (1 + ν) + 14.3 * (mbar * ((l : ℝ) * (l - 1)))) * ‖A‖) ≤ δ := by
   have hApos : 0 < ‖A‖ := norm_pos_iff.2 hA0
-  have hy : 0 < 2 * ‖A‖ * H := by positivity
-  have he : 1 / (2 * ‖A‖) / H * (2 * ‖A‖ * H) = 1 := by
-    field_simp
-  have h1 : ((⌊1 / (2 * ‖A‖) / H⌋₊ : ℕ) : ℝ) * (2 * ‖A‖ * H) ≤ 1 :=
-    (mul_le_mul_of_nonneg_right (Nat.floor_le (by positivity)) hy.le).trans he.le
-  have h2 : 1 < (((⌊1 / (2 * ‖A‖) / H⌋₊ : ℕ) : ℝ) + 1) * (2 * ‖A‖ * H) :=
-    he.symm.le.trans_lt (mul_lt_mul_of_pos_right (Nat.lt_floor_add_one _) hy)
-  have hmain := run_order_lead N M hA hP Fi g hH.le hw0 hl hrowN hrow0 hrow hw hlx
-    (K := ⌊1 / (2 * ‖A‖) / H⌋₊) (by linarith) (by linarith) hN hM x hx hδ
-  have hδ0 : 0 ≤ δ := by
-    obtain ⟨y, hy'⟩ := exists_ne (0 : E)
-    have h := (norm_nonneg _).trans (hδ y hy' 0 (Nat.zero_le _))
-    exact nonneg_of_mul_nonneg_left h (norm_pos_iff.2 hy')
+  obtain ⟨h1, h2⟩ := horizon_floor hApos hH
+  have hmain := run_order_lead N M hA hP Fi g hH.le hw0 hl hrowN hrow0 hrow hw hlx h1 h2 hN hM
+    x hx hδ
+  have hδ0 := relative_error_bound_nonneg hδ
   have hν0 : 0 ≤ ν := (norm_nonneg N).trans hN
-  have hmm : 0 ≤ mbar * ((l : ℝ) * (l - 1)) := by
-    have hl1 : (1 : ℝ) ≤ l := by exact_mod_cast hl
-    rcases Nat.lt_or_ge 1 l with h2 | h2
-    · exact mul_nonneg ((norm_nonneg _).trans (hM 1 le_rfl h2))
-        (mul_nonneg (by linarith) (by linarith))
-    · have h1 : l = 1 := by omega
-      rw [h1]
-      simp
+  have hmm := bound_mul_pred_nonneg hl hM
   have hd1 : 0 < (212 / 7 * (1 + ν) + 100 / 7 * (mbar * ((l : ℝ) * (l - 1)))) * ‖A‖ :=
     mul_pos (by linarith) hApos
   have hd2 : (212 / 7 * (1 + ν) + 100 / 7 * (mbar * ((l : ℝ) * (l - 1)))) * ‖A‖ ≤

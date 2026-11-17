@@ -41,25 +41,27 @@ theorem exists_unit_norm_sq_eq_of_hasEigenvalue (T : E →L[ℝ] E) {μ : ℝ}
   · rw [map_smul, norm_smul, norm_inv, norm_norm, mul_pow, key]
     field_simp
 
+/-- Every singular value is the stretch of a unit vector. -/
+theorem exists_unit_norm_apply_eq_singularValues (T : E →L[ℝ] E) {i : ℕ}
+    (hi : i < finrank ℝ E) : ∃ v : E, ‖v‖ = 1 ∧ ‖T v‖ = (T : E →ₗ[ℝ] E).singularValues i := by
+  obtain ⟨v, hv, hTv⟩ := exists_unit_norm_sq_eq_of_hasEigenvalue T
+    ((T : E →ₗ[ℝ] E).hasEigenvalue_adjoint_comp_self_sq_singularValues hi)
+  exact ⟨v, hv,
+    (sq_eq_sq₀ (norm_nonneg _) ((T : E →ₗ[ℝ] E).singularValues_nonneg i)).1 hTv⟩
+
 /-- Every singular value is at most the largest stretch. -/
 theorem singularValues_le_opNorm (T : E →L[ℝ] E) {i : ℕ} (hi : i < finrank ℝ E) :
     (T : E →ₗ[ℝ] E).singularValues i ≤ ‖T‖ := by
-  obtain ⟨v, hv, hTv⟩ := exists_unit_norm_sq_eq_of_hasEigenvalue T
-    ((T : E →ₗ[ℝ] E).hasEigenvalue_adjoint_comp_self_sq_singularValues hi)
+  obtain ⟨v, hv, h3⟩ := exists_unit_norm_apply_eq_singularValues T hi
   have h1 : ‖T v‖ ≤ ‖T‖ := by simpa [hv] using T.le_opNorm v
-  have h2 := (T : E →ₗ[ℝ] E).singularValues_nonneg i
-  have h3 : ‖T v‖ = (T : E →ₗ[ℝ] E).singularValues i := (sq_eq_sq₀ (norm_nonneg _) h2).1 hTv
-  linarith
+  exact h3.ge.trans h1
 
 /-- Every singular value is at least any lower bound on the stretches. -/
 theorem le_singularValues (T : E →L[ℝ] E) {m : ℝ} (h : ∀ y, m * ‖y‖ ≤ ‖T y‖)
     {i : ℕ} (hi : i < finrank ℝ E) : m ≤ (T : E →ₗ[ℝ] E).singularValues i := by
-  obtain ⟨v, hv, hTv⟩ := exists_unit_norm_sq_eq_of_hasEigenvalue T
-    ((T : E →ₗ[ℝ] E).hasEigenvalue_adjoint_comp_self_sq_singularValues hi)
+  obtain ⟨v, hv, h3⟩ := exists_unit_norm_apply_eq_singularValues T hi
   have h1 : m ≤ ‖T v‖ := by simpa [hv] using h v
-  have h2 := (T : E →ₗ[ℝ] E).singularValues_nonneg i
-  have h3 : ‖T v‖ = (T : E →ₗ[ℝ] E).singularValues i := (sq_eq_sq₀ (norm_nonneg _) h2).1 hTv
-  linarith
+  exact h1.trans h3.le
 
 /-- **The largest singular value is the operator norm.** -/
 theorem singularValues_zero_eq_opNorm [Nontrivial E] (T : E →L[ℝ] E) :

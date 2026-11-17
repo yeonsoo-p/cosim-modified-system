@@ -110,10 +110,7 @@ theorem row_lead_arith {G R H Hl a t β b Kp lr δ : ℝ} (hlr : 1 ≤ lr) (hG :
     (hbar : 0.35 * (Kp * t) / (b + Kp * t) ≤ δ) :
     0.35 * (G * Hl - (R + G * (2 * lr + β + 1 / 5) * a) * (Hl * H)) / (2 * b * a) ≤ δ := by
   have hx : 0 < H * a := mul_pos hH ha
-  have hKp0 : 0 ≤ Kp := by
-    by_contra h
-    have := mul_neg_of_neg_of_pos (not_le.1 h) hx
-    linarith
+  have hKp0 := run_length_nonneg_of_le hx hlx hKp
   have hKt : 0 ≤ Kp * t := mul_nonneg hKp0 ht
   have hδ0 : 0 ≤ δ :=
     le_trans (div_nonneg (mul_nonneg (by norm_num) hKt) (by linarith)) hbar
@@ -148,20 +145,6 @@ theorem row_lead_arith {G R H Hl a t β b Kp lr δ : ℝ} (hlr : 1 ≤ lr) (hG :
   refine le_trans ?_ hbar
   rw [div_le_div_iff₀ hd (by linarith)]
   linarith
-
-/-- The number of steps of the interval `1/(2a)`: `K = ⌊1/(2a)/H⌋` has
-`K H a ≤ 1/2 < (K + 1) H a`. -/
-theorem horizon_floor {a H : ℝ} (ha : 0 < a) (hH : 0 < H) :
-    ((⌊1 / (2 * a) / H⌋₊ : ℕ) : ℝ) * H * a ≤ 1 / 2 ∧
-      1 / 2 < (((⌊1 / (2 * a) / H⌋₊ : ℕ) : ℝ) + 1) * H * a := by
-  have hy : 0 < 2 * a * H := by positivity
-  have he : 1 / (2 * a) / H * (2 * a * H) = 1 := by
-    field_simp
-  have h1 : ((⌊1 / (2 * a) / H⌋₊ : ℕ) : ℝ) * (2 * a * H) ≤ 1 :=
-    (mul_le_mul_of_nonneg_right (Nat.floor_le (by positivity)) hy.le).trans he.le
-  have h2 : 1 < (((⌊1 / (2 * a) / H⌋₊ : ℕ) : ℝ) + 1) * (2 * a * H) :=
-    he.symm.le.trans_lt (mul_lt_mul_of_pos_right (Nat.lt_floor_add_one _) hy)
-  constructor <;> linarith
 
 /-- The constant of a subsystem that runs after its partners is at most one in modulus:
 `|γ'_l| ≤ (l-1)!/l! ≤ 1`. -/
@@ -241,11 +224,8 @@ theorem rowDefect_eq_lateDefect (Fi : F →L[ℝ] F) (gNew : G →L[ℝ] F) (g :
   obtain ⟨n, rfl⟩ : ∃ n, l = n + 1 := ⟨l - 1, by omega⟩
   rw [Nat.add_sub_cancel] at hlast
   ext v
-  have hsum2 : ∑ r ∈ range (n + 1), g r (C ((exp (-(H • A)) ^ r) v)) =
-      ∑ r ∈ range n, g r (C ((exp (-(H • A)) ^ r) v)) := by
-    rw [sum_range_succ, hlast]
-    simp
-  rw [rowDefect_apply, sum_row_rule_apply (exp (-(H • A))) Fi g hrow0 hrow v, hsum2, hrowN]
+  rw [rowDefect_apply, sum_row_rule_apply (exp (-(H • A))) Fi g hrow0 hrow v,
+    sum_range_succ_of_last_eq_zero g hlast, hrowN]
   unfold lateDefect
   simp only [_root_.sub_apply, _root_.sum_apply, ContinuousLinearMap.comp_apply,
     Nat.add_sub_cancel]
@@ -272,48 +252,25 @@ theorem run_order_row_lead_of_defect (A : E →L[ℝ] E) (P N : E →L[ℝ] F) (
       (1 + β * (H * ‖A‖)) * ‖rowDefect P N M (exp (H • A)) (exp (-(H • A))) l‖) :
     0.35 * (Γ * H ^ l - (R + Γ * (2 * l + β + 1 / 5) * ‖A‖) * H ^ (l + 1)) /
       (2 * (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1))) * ‖A‖) ≤ δ := by
-  have hA0 : 0 ≤ ‖A‖ := norm_nonneg A
-  have hx0 : 0 ≤ H * ‖A‖ := mul_nonneg hH hA0
-  have hl1 : (1 : ℝ) ≤ l := by exact_mod_cast hl
-  have hxpos : 0 < H * ‖A‖ := by
-    by_contra h
-    have h0 : H * ‖A‖ = 0 := le_antisymm (not_lt.1 h) hx0
-    rw [mul_assoc, h0, mul_zero] at hK1
-    norm_num at hK1
-  have hHpos : 0 < H := lt_of_le_of_ne hH fun h => by
-    rw [← h, zero_mul] at hxpos
-    exact lt_irrefl _ hxpos
-  have hApos : 0 < ‖A‖ := lt_of_le_of_ne hA0 fun h => by
-    rw [← h, mul_zero] at hxpos
-    exact lt_irrefl _ hxpos
-  have hx1 : H * ‖A‖ ≤ 1 := by
-    have := mul_le_mul_of_nonneg_right hl1 hx0
-    linarith
-  have hK : l ≤ K := by
-    by_contra h
-    have h1 : (K : ℝ) + 1 ≤ l := by exact_mod_cast not_le.1 h
-    have h2 : ((K : ℝ) + 1) * (H * ‖A‖) ≤ l * (H * ‖A‖) := mul_le_mul_of_nonneg_right h1 hx0
-    linarith
+  obtain ⟨hHpos, hApos⟩ := pos_of_half_lt_horizon hH (norm_nonneg A) hK1
+  have hx0 : 0 ≤ H * ‖A‖ := (mul_pos hHpos hApos).le
+  have hx1 : H * ‖A‖ ≤ 1 := (le_half_of_two_mul_le hl hx0 hlx).trans (by norm_num)
+  have hK : l ≤ K := le_of_half_lt_horizon hx0 hlx hK1
   have hbar := run_order_row A P N M hH hl hK hKH hP hN hM x hx hδ
   have hn : 0 ≤ nbar := (norm_nonneg N).trans hN
-  have hmm : 0 ≤ mbar * ((l : ℝ) * (l - 1)) := by
-    rcases hl.eq_or_lt with h1 | h1
-    · subst h1
-      simp
-    · exact mul_nonneg ((norm_nonneg _).trans (hM 1 le_rfl h1))
-        (mul_nonneg (by linarith) (by linarith))
+  have hmm := bound_mul_pred_nonneg hl hM
   have hb : (2.65 : ℝ) ≤ 2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) := by linarith
   have hG1 : Γ * H ^ l ≤ ‖A‖ * (H * ‖A‖) := by
     have h2 : (H * ‖A‖) ^ l ≤ H * ‖A‖ := pow_le_of_le_one hx0 hx1 (by omega)
     calc Γ * H ^ l ≤ ‖A‖ ^ (l + 1) * H ^ l := mul_le_mul_of_nonneg_right hΓ (pow_nonneg hH l)
       _ = ‖A‖ * (H * ‖A‖) ^ l := by rw [mul_pow, pow_succ]; ring
-      _ ≤ ‖A‖ * (H * ‖A‖) := mul_le_mul_of_nonneg_left h2 hA0
+      _ ≤ ‖A‖ * (H * ‖A‖) := mul_le_mul_of_nonneg_left h2 hApos.le
   have hKp : (1 - 2 * (l : ℝ) * (H * ‖A‖)) / 2 ≤ ((K : ℝ) - l + 1) * (H * ‖A‖) := by
     linarith
   rw [pow_succ H (l + 1), pow_succ H l] at hmem
   rw [pow_succ H l]
-  exact row_lead_arith hl1 hΓ0 hR hHpos (pow_nonneg hH l) hApos (norm_nonneg _) hβ hb hlx hG1
-    hKp hmem hbar
+  exact row_lead_arith (by exact_mod_cast hl) hΓ0 hR hHpos (pow_nonneg hH l) hApos
+    (norm_nonneg _) hβ hb hlx hG1 hKp hmem hbar
 
 /-- **Display (30) for a subsystem with old samples, with an explicit remainder.** Subsystem `i`
 (projection `P`, `‖P‖ ≤ 1`, `P ∘ A = Ai ∘ P + L ∘ C`) with `l ≥ 1` held samples, all old: its
@@ -341,24 +298,15 @@ theorem run_order_row_lead (N : E →L[ℝ] F) (M : ℕ → E →L[ℝ] F)
         (memC1 l * ‖A‖ ^ (l + 2) + memC2 l * w * ‖A‖ ^ (l + 1) +
           adamsGamma l * unseenRate P C A l * (2 * l + memB l + 1 / 5) * ‖A‖) * H ^ (l + 1)) /
       (2 * (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1))) * ‖A‖) ≤ δ := by
-  have hx1 : H * ‖A‖ ≤ 1 := by
-    have hl1 : (1 : ℝ) ≤ l := by exact_mod_cast hl
-    have := mul_le_mul_of_nonneg_right hl1 (mul_nonneg hH (norm_nonneg A))
-    linarith
-  have hmem : adamsGamma l * unseenRate P C A l * H ^ (l + 1) -
-      (memC1 l * ‖A‖ ^ (l + 2) + memC2 l * w * ‖A‖ ^ (l + 1)) * H ^ (l + 2) ≤
-      (1 + memB l * (H * ‖A‖)) * ‖localDefect P Fi g C A H l‖ :=
-    memory_lead hA hP Fi g hH hw0 hx1 hl hw
+  have hmem := memory_lead hA hP Fi g hH hw0
+    ((le_half_of_two_mul_le hl (mul_nonneg hH (norm_nonneg A)) hlx).trans (by norm_num)) hl hw
   rw [← rowDefect_eq_localDefect Fi g H hl hrowN hrow0 hrow] at hmem
   have hΓ : adamsGamma l * unseenRate P C A l ≤ ‖A‖ ^ (l + 1) :=
     (mul_le_mul (adamsGamma_le_one l) (unseenRate_le hP l) (unseenRate_nonneg P C A l)
       zero_le_one).trans_eq (one_mul _)
-  have hR0 : 0 ≤ memC1 l * ‖A‖ ^ (l + 2) + memC2 l * w * ‖A‖ ^ (l + 1) := by
-    have h1 := memC1_nonneg l
-    have h2 := memC2_nonneg l
-    positivity
   exact run_order_row_lead_of_defect A P N M hH hl hlx hKH hK1 hP hN hM x hx hδ
-    (mul_nonneg (adamsGamma_nonneg l) (unseenRate_nonneg P C A l)) hΓ hR0 (memB_nonneg l) hmem
+    (mul_nonneg (adamsGamma_nonneg l) (unseenRate_nonneg P C A l)) hΓ
+    (memRem_nonneg l (norm_nonneg A) hw0) (memB_nonneg l) hmem
 
 /-- **Display (30) for a subsystem with old samples, over the interval `1/(2‖A‖)`:**
 `run_order_row_lead` for `K = ⌊1/(2‖A‖)/H⌋`, `H > 0`, `A ≠ 0`. -/
@@ -410,14 +358,9 @@ theorem run_order_row_late (N : E →L[ℝ] F) (M : ℕ → E →L[ℝ] F)
         (lateC1 l * ‖A‖ ^ (l + 2) + lateC2 l * w * ‖A‖ ^ (l + 1) +
           |lateGamma l| * unseenRate P C A l * (2 * l + lateB l + 1 / 5) * ‖A‖) * H ^ (l + 1)) /
       (2 * (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1))) * ‖A‖) ≤ δ := by
-  have hx1 : H * ‖A‖ ≤ 1 := by
-    have hl1 : (1 : ℝ) ≤ l := by exact_mod_cast hl
-    have := mul_le_mul_of_nonneg_right hl1 (mul_nonneg hH (norm_nonneg A))
-    linarith
-  have hmem : |lateGamma l| * unseenRate P C A l * H ^ (l + 1) -
-      (lateC1 l * ‖A‖ ^ (l + 2) + lateC2 l * w * ‖A‖ ^ (l + 1)) * H ^ (l + 2) ≤
-      (1 + lateB l * (H * ‖A‖)) * ‖lateDefect P Fi gNew g C A H l‖ :=
-    memory_late hA hP Fi gNew g hH hw0 hx1 hl hwNew hw
+  have hmem := memory_late hA hP Fi gNew g hH hw0
+    ((le_half_of_two_mul_le hl (mul_nonneg hH (norm_nonneg A)) hlx).trans (by norm_num)) hl
+    hwNew hw
   rw [← rowDefect_eq_lateDefect Fi gNew g H hl hrowN hrow0 hrow hlast] at hmem
   have hΓ : |lateGamma l| * unseenRate P C A l ≤ ‖A‖ ^ (l + 1) :=
     (mul_le_mul (abs_lateGamma_le_one hl) (unseenRate_le hP l) (unseenRate_nonneg P C A l)

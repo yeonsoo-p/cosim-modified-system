@@ -342,14 +342,6 @@ theorem gsStep_eq_infoStep (H : ℝ) (k : Fin n → ℝ) (w : Matrix (Fin n) (Fi
       · simp [hij, hlt, not_not.1 (mt h3.1 hlt)]
   rw [gsStep, infoStep, h1, h2]
 
-/-- `ScalarNet.det_gsStep` as an instance of `det_infoStep_gs`: the determinant of the
-Gauss–Seidel step matrix of `GaussSeidel` is the product of the local exponentials. -/
-theorem det_gsStep_of_infoStep (H : ℝ) (k : Fin n → ℝ) (w : Matrix (Fin n) (Fin n) ℝ) :
-    (N.gsStep H k w).det = ∏ i, Real.exp (N.rate k i * H) := by
-  rw [gsStep_eq_infoStep, det_infoStep_gs _ Fin.val_injective]
-  intro i
-  simp [infoG]
-
 /-- **Output feedback realises every scheme of scalar stores with positive local coefficients**
 (order of execution `0, 1, …, n-1`): for `F i > 0` and `G` with zero diagonal there are gains and
 weights, the weights supported where `G` is, whose Gauss–Seidel step matrix is the one-step map

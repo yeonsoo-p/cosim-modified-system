@@ -205,6 +205,21 @@ theorem visBound_le_scheme (Pr : E →L[ℝ] Ei) (P U : E →L[ℝ] E) (N M : �
   visibility_floor Pr P U Set.univ N (fun FG _ => visBound_le_norm_rule Pr U N FG.1 FG.2) F G
     (Set.mem_univ _) M hstep
 
+/-- **A map that vanishes on the states not shown is a rule on the monolithic samples.** If the
+own state and the samples are finite-dimensional and the continuous map `R` vanishes on the
+states not shown, then `R = F ∘ Pr + Σ_k G k ∘ N k` with continuous `F` and `G k`. -/
+theorem exists_rule_of_notShown_le [FiniteDimensional ℝ Ei] [∀ k, FiniteDimensional ℝ (Y k)]
+    (Pr : E →L[ℝ] Ei) (N : ∀ k, E →L[ℝ] Y k) (R : E →L[ℝ] Ei)
+    (hk : notShown Pr N ≤ LinearMap.ker (R : E →ₗ[ℝ] Ei)) :
+    ∃ (F : Ei →L[ℝ] Ei) (G : ∀ k, Y k →L[ℝ] Ei), R = F.comp Pr + ∑ k, (G k).comp (N k) := by
+  have hk' : LinearMap.ker (Pr : E →ₗ[ℝ] Ei) ⊓ ⨅ k, LinearMap.ker (N k : E →ₗ[ℝ] Y k) ≤
+      LinearMap.ker (R : E →ₗ[ℝ] Ei) := hk
+  obtain ⟨F, G, hFG⟩ := (exists_rule_iff_ker_le _ _ _).2 hk'
+  refine ⟨LinearMap.toContinuousLinearMap F, fun k => LinearMap.toContinuousLinearMap (G k), ?_⟩
+  ext x
+  have hx := LinearMap.congr_fun hFG x
+  simpa [LinearMap.sum_apply] using hx
+
 /-- **The visibility bound vanishes iff the block row is a rule on the monolithic samples**
 (the paper, Theorem 4.2, the step of the converse): `f = 0` iff
 `Pr ∘ U = F ∘ Pr + Σ_k G k ∘ N k` for some `F`, `G`. -/
@@ -215,14 +230,8 @@ theorem visBound_eq_zero_iff_exists_rule [FiniteDimensional ℝ Ei] [∀ k, Fini
         Pr.comp U = F.comp Pr + ∑ k, (G k).comp (N k) := by
   constructor
   · intro h
-    have hk : LinearMap.ker (Pr : E →ₗ[ℝ] Ei) ⊓ ⨅ k, LinearMap.ker (N k : E →ₗ[ℝ] Y k) ≤
-        LinearMap.ker ((Pr.comp U : E →L[ℝ] Ei) : E →ₗ[ℝ] Ei) := fun v hv =>
+    exact exists_rule_of_notShown_le Pr N (Pr.comp U) fun v hv =>
       (visBound_eq_zero_iff Pr U N).1 h v hv
-    obtain ⟨F, G, hFG⟩ := (exists_rule_iff_ker_le _ _ _).2 hk
-    refine ⟨LinearMap.toContinuousLinearMap F, fun k => LinearMap.toContinuousLinearMap (G k), ?_⟩
-    ext x
-    have hx := LinearMap.congr_fun hFG x
-    simpa [LinearMap.sum_apply] using hx
   · rintro ⟨F, G, h⟩
     refine le_antisymm ?_ (visBound_nonneg _ _ _)
     have h1 := visBound_le_norm_rule Pr U N F G
@@ -247,21 +256,14 @@ theorem exists_rule_eq_comp_starProjection (Pr : E →L[ℝ] Ei) (U : E →L[ℝ
         (Pr.comp U).comp (notShown Pr N).starProjection := by
   set R₀ : E →L[ℝ] Ei :=
     (Pr.comp U).comp (ContinuousLinearMap.id ℝ E - (notShown Pr N).starProjection) with hR₀
-  have hk : LinearMap.ker (Pr : E →ₗ[ℝ] Ei) ⊓ ⨅ k, LinearMap.ker (N k : E →ₗ[ℝ] Y k) ≤
-      LinearMap.ker (R₀ : E →ₗ[ℝ] Ei) := fun v hv => by
+  have hk : notShown Pr N ≤ LinearMap.ker (R₀ : E →ₗ[ℝ] Ei) := fun v hv => by
     have hv' : (notShown Pr N).starProjection v = v :=
       Submodule.starProjection_eq_self_iff.2 hv
     simp [hR₀, hv']
-  obtain ⟨F, G, hFG⟩ := (exists_rule_iff_ker_le _ _ _).2 hk
-  refine ⟨LinearMap.toContinuousLinearMap F, fun k => LinearMap.toContinuousLinearMap (G k), ?_⟩
-  ext x
-  have hx : R₀ x = F (Pr x) + ∑ k, G k (N k x) := by
-    simpa [LinearMap.sum_apply] using LinearMap.congr_fun hFG x
-  have hx' : R₀ x = Pr (U x) - Pr (U ((notShown Pr N).starProjection x)) := by
-    simp [hR₀]
-  simp only [_root_.sub_apply, ContinuousLinearMap.comp_apply, _root_.sum_apply,
-    LinearMap.coe_toContinuousLinearMap']
-  rw [sub_sub, ← hx, hx', sub_sub_cancel]
+  obtain ⟨F, G, hFG⟩ := exists_rule_of_notShown_le Pr N R₀ hk
+  refine ⟨F, G, ?_⟩
+  rw [sub_sub, ← hFG, hR₀, ContinuousLinearMap.comp_sub, ContinuousLinearMap.comp_id,
+    sub_sub_cancel]
 
 /-- **The equality behind Definition 4.1** (the paper, Theorem 4.2): the visibility bound is the
 least distance, in the operator norm, of the block row `Pr ∘ U` of the monolithic step from the

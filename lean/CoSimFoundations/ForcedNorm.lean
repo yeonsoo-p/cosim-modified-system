@@ -173,18 +173,8 @@ theorem Consistent.cblock_signedCoupling_eq_sgn {A U : Matrix (Fin n) (Fin n) �
     (h : S.Consistent A U H a b c) {s t : κ} (hst : s ≠ t) (hnp : ¬ S.partner s t) :
     S.cblock s t (S.signedCoupling A * A) = S.cblock s t (A * S.sgn s * A) := by
   refine S.cblock_congr fun p q hp hq => ?_
-  have h1 := S.sgn_row A p q
-  rw [hp] at h1
-  have h0 : (S.blockDiag A * A) p q = 0 := by
-    rw [Matrix.mul_apply]
-    refine Finset.sum_eq_zero fun r _ => ?_
-    rw [S.blockDiag_apply]
-    by_cases hr : S.sub p = S.sub r
-    · have hrq : S.sub r ≠ S.sub q := by rw [← hr, hp, hq]; exact hst
-      have hnp' : ¬ S.partner (S.sub r) (S.sub q) := by rw [← hr, hp, hq]; exact hnp
-      rw [h.hA r q hrq hnp', mul_zero]
-    · rw [ite_eq_right hr, zero_mul]
-  rw [h1, h0, sub_zero]
+  obtain ⟨hne, hnp', -⟩ := S.sub_ne_of_eq hst hnp hp hq
+  rw [S.signedCoupling_mul_apply_eq_sgn h.hA hne hnp', hp]
 
 /-- `a_st ≤ ½ ‖A‖²` between different subsystems that are not partners. -/
 theorem Consistent.forcedCoeff_le {A U : Matrix (Fin n) (Fin n) ℝ} {H a b c : ℝ}

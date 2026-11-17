@@ -34,21 +34,10 @@ variable {𝔸 : Type*} [NormedRing 𝔸] [NormedAlgebra ℝ 𝔸] [CompleteSpac
 theorem norm_defect_sub_one_le_of_mul_le (At A : 𝔸) {H k : ℝ} (hH : 0 ≤ H)
     (hk : ∀ τ ∈ Set.Icc 0 H, ‖exp (τ • At)‖ * ‖exp (τ • (-A))‖ ≤ k) :
     ‖exp (H • At) * exp (H • (-A)) - 1‖ ≤ H * (k * ‖At - A‖) := by
-  rw [defect_sub_one_eq_integral]
-  have hbound : ∀ τ ∈ Set.uIoc (0 : ℝ) H,
-      ‖exp (τ • At) * (At - A) * exp (τ • (-A))‖ ≤ k * ‖At - A‖ := by
-    intro τ hτ
-    rw [Set.uIoc_of_le hH] at hτ
-    have hk' := hk τ ⟨hτ.1.le, hτ.2⟩
-    calc ‖exp (τ • At) * (At - A) * exp (τ • (-A))‖
-        ≤ ‖exp (τ • At)‖ * ‖At - A‖ * ‖exp (τ • (-A))‖ :=
-          (norm_mul_le _ _).trans (mul_le_mul_of_nonneg_right (norm_mul_le _ _) (norm_nonneg _))
-      _ = (‖exp (τ • At)‖ * ‖exp (τ • (-A))‖) * ‖At - A‖ := by ring
-      _ ≤ k * ‖At - A‖ := mul_le_mul_of_nonneg_right hk' (norm_nonneg _)
-  have h := intervalIntegral.norm_integral_le_of_norm_le_const hbound
-  rw [sub_zero, abs_of_nonneg hH] at h
-  rw [mul_comm]
-  exact h
+  refine norm_defect_sub_one_le_of_bound At A hH fun τ hτ => ?_
+  calc ‖exp (τ • At)‖ * ‖At - A‖ * ‖exp (τ • (-A))‖
+      = (‖exp (τ • At)‖ * ‖exp (τ • (-A))‖) * ‖At - A‖ := by ring
+    _ ≤ k * ‖At - A‖ := mul_le_mul_of_nonneg_right (hk τ hτ) (norm_nonneg _)
 
 end Algebra
 
@@ -143,21 +132,15 @@ theorem difference_link_floor_kappa (At A : E →L[ℝ] E) {H c₁ c₂ : ℝ} (
     (hAt : ∀ x, ⟪x, At x⟫ ≤ c₁ * ‖x‖ ^ 2) (hA : ∀ x, -⟪x, A x⟫ ≤ c₂ * ‖x‖ ^ 2)
     {e : E} (he : ‖e‖ = 1) (f : E) (h : ⟪e, exp (H • At) f⟫ = 0) :
     |⟪e, exp (H • A) f⟫| ≤
-      H * (Real.exp (H * max (c₁ + c₂) 0) * ‖At - A‖) * ‖exp (H • A) f‖ := by
-  have h1 := link_floor (exp (H • At) * exp (H • (-A))) (exp (H • A)) he f
-    (by rw [defect_apply_reference]; exact h)
-  exact h1.trans
-    (mul_le_mul_of_nonneg_right (norm_defect_sub_one_le_kappa At A hH hAt hA) (norm_nonneg _))
+      H * (Real.exp (H * max (c₁ + c₂) 0) * ‖At - A‖) * ‖exp (H • A) f‖ :=
+  difference_link_floor_of_le At A (norm_defect_sub_one_le_kappa At A hH hAt hA) he f h
 
 /-- **Turning floor of the difference, with `κ_H`.** -/
 theorem difference_turning_floor_kappa (At A : E →L[ℝ] E) {H c₁ c₂ : ℝ} (hH : 0 ≤ H)
     (hAt : ∀ x, ⟪x, At x⟫ ≤ c₁ * ‖x‖ ^ 2) (hA : ∀ x, -⟪x, A x⟫ ≤ c₂ * ‖x‖ ^ 2)
     {e : E} (he : ‖e‖ = 1) (h : 0 ≤ ⟪e, exp (H • At) e⟫) :
     -⟪e, exp (H • A) e⟫ ≤
-      H * (Real.exp (H * max (c₁ + c₂) 0) * ‖At - A‖) * ‖exp (H • A) e‖ := by
-  have h1 := turning_floor (exp (H • At) * exp (H • (-A))) (exp (H • A)) he
-    (by rw [defect_apply_reference]; exact h)
-  exact h1.trans
-    (mul_le_mul_of_nonneg_right (norm_defect_sub_one_le_kappa At A hH hAt hA) (norm_nonneg _))
+      H * (Real.exp (H * max (c₁ + c₂) 0) * ‖At - A‖) * ‖exp (H • A) e‖ :=
+  difference_turning_floor_of_le At A (norm_defect_sub_one_le_kappa At A hH hAt hA) he h
 
 end CoSimFoundations

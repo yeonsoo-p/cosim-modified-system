@@ -90,17 +90,7 @@ theorem real_spectrum_iff_inv {E A X : Matrix ι ι ℝ} {H : ℝ} (hH : 0 < H)
         ∀ (theta : ℂ) (v : ι → ℂ), v ≠ 0 →
           (E⁻¹ * A).map (algebraMap ℝ ℂ) *ᵥ v = theta • v → theta.re < 0 := by
   rw [real_spectrum_iff hH hmid hdet, isUnit_iff_ne_zero]
-  refine and_congr_right fun hE => ?_
-  have hi : (E⁻¹).map (algebraMap ℝ ℂ) * E.map (algebraMap ℝ ℂ) = 1 := by
-    have h := congrArg (algebraMap ℝ ℂ).mapMatrix
-      (Matrix.nonsing_inv_mul E (isUnit_iff_ne_zero.2 hE))
-    rwa [map_mul, map_one] at h
-  have hm : (E⁻¹ * A).map (algebraMap ℝ ℂ) =
-      (E⁻¹).map (algebraMap ℝ ℂ) * A.map (algebraMap ℝ ℂ) :=
-    map_mul (algebraMap ℝ ℂ).mapMatrix _ _
-  rw [hm]
-  exact forall_congr' fun theta => forall_congr' fun v => imp_congr_right fun _ =>
-    imp_congr_left (pencil_iff_of_left_inv hi)
+  exact and_congr_right fun hE => pencil_re_neg_iff_inv hE
 
 end SchemePencil
 
@@ -306,22 +296,8 @@ variable {κ : Type*} [DecidableEq κ] (S : HeldScheme n κ)
 /-- **`H Â` of the zero-order hold:** `F - 1 + M + N = H φ A`, `φ = φ₁(H A₀)`. -/
 theorem zoh_pencilHA (A : Matrix (Fin n) (Fin n) ℝ)
     (hA : ∀ p q, S.sub p ≠ S.sub q → ¬ S.partner (S.sub p) (S.sub q) → A p q = 0) (H : ℝ) :
-    (S.zoh A hA H).pencilHA = H • (phiOne (H • S.blockDiag A) * A) := by
-  have hF : NormedSpace.exp (H • S.blockDiag A) =
-      1 + H • (phiOne (H • S.blockDiag A) * S.blockDiag A) := by
-    rw [exp_eq_one_add_phiOne_mul, mul_smul_comm]
-  have hN : S.zohNew A H = H • (phiOne (H • S.blockDiag A) * S.couplingNew A) := by
-    rw [S.zohNew_eq, zohKernel, smul_mul_assoc]
-  have hM : S.zohOld A H = H • (phiOne (H • S.blockDiag A) * S.couplingOld A) := by
-    rw [S.zohOld_eq, zohKernel, smul_mul_assoc]
-  have hA' : phiOne (H • S.blockDiag A) * A =
-      phiOne (H • S.blockDiag A) * S.blockDiag A +
-        (phiOne (H • S.blockDiag A) * S.couplingOld A +
-          phiOne (H • S.blockDiag A) * S.couplingNew A) := by
-    rw [← mul_add, ← mul_add, S.couplingOld_add_couplingNew, S.blockDiag_add_coupling]
-  change NormedSpace.exp (H • S.blockDiag A) - 1 + S.zohOld A H + S.zohNew A H = _
-  rw [hF, hN, hM, hA']
-  module
+    (S.zoh A hA H).pencilHA = H • (phiOne (H • S.blockDiag A) * A) :=
+  S.exp_sub_one_add_zohOld_add_zohNew A H
 
 /-- **`Â` of the zero-order hold:** for `H ≠ 0`, `Â = φ A`, `φ = φ₁(H A₀)`. -/
 theorem zoh_pencilA (A : Matrix (Fin n) (Fin n) ℝ)
@@ -335,22 +311,8 @@ theorem zoh_pencilE_eq (A : Matrix (Fin n) (Fin n) ℝ)
     (hA : ∀ p q, S.sub p ≠ S.sub q → ¬ S.partner (S.sub p) (S.sub q) → A p q = 0) (H : ℝ) :
     (S.zoh A hA H).pencilE =
       1 + (H / 2) • (phiOne (H • S.blockDiag A) * S.blockDiag A) -
-        (H / 2) • (phiOne (H • S.blockDiag A) * S.signedCoupling A) := by
-  have hF : NormedSpace.exp (H • S.blockDiag A) =
-      1 + H • (phiOne (H • S.blockDiag A) * S.blockDiag A) := by
-    rw [exp_eq_one_add_phiOne_mul, mul_smul_comm]
-  have hN : S.zohNew A H = H • (phiOne (H • S.blockDiag A) * S.couplingNew A) := by
-    rw [S.zohNew_eq, zohKernel, smul_mul_assoc]
-  have hM : S.zohOld A H = H • (phiOne (H • S.blockDiag A) * S.couplingOld A) := by
-    rw [S.zohOld_eq, zohKernel, smul_mul_assoc]
-  have hς : phiOne (H • S.blockDiag A) * S.signedCoupling A =
-      phiOne (H • S.blockDiag A) * S.couplingNew A -
-        phiOne (H • S.blockDiag A) * S.couplingOld A := by
-    rw [← mul_sub, S.couplingNew_sub_couplingOld]
-  change (1 / 2 : ℝ) • (1 + NormedSpace.exp (H • S.blockDiag A)) -
-    (1 / 2 : ℝ) • (S.zohNew A H - S.zohOld A H) = _
-  rw [hF, hN, hM, hς]
-  module
+        (H / 2) • (phiOne (H • S.blockDiag A) * S.signedCoupling A) :=
+  S.half_one_add_exp_sub_half_zoh A H
 
 /-- **`Ê` of the zero-order hold:** if `φ = φ₁(H A₀)` is invertible, `Ê = φ E` with
 `E = Ψ - (H/2) A_ς` (`midpointE`), the matrix of eq. `eq:midpoint`. -/

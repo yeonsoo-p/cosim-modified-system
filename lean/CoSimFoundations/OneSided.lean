@@ -68,6 +68,16 @@ theorem sum_mul_apply_eq_zero {m : ℕ} (G : Matrix (Fin n) (Fin m) ℝ)
   simp only [mul_assoc]
   rw [← Finset.mul_sum, hC j, mul_zero]
 
+/-- A sum against a vector supported on a subsystem `t` depends only on the coefficients at the
+states of `t`. -/
+theorem sum_mul_congr_of_support {κ : Type*} {sub : Fin n → κ} {t : κ}
+    {v : EuclideanSpace ℝ (Fin n)} (hv : ∀ q, sub q ≠ t → v q = 0) {a b : Fin n → ℝ}
+    (h : ∀ q, sub q = t → a q = b q) : ∑ q, a q * v q = ∑ q, b q * v q := by
+  refine Finset.sum_congr rfl fun q _ => ?_
+  by_cases hq : sub q = t
+  · rw [h q hq]
+  · rw [hv q hq, mul_zero, mul_zero]
+
 end OneStep
 
 open OneStep
@@ -108,10 +118,7 @@ theorem Hidden.of_ports {m : ℕ} {A : Matrix (Fin n) (Fin n) ℝ} {C : Matrix (
   · rw [opE_apply, hN]
     exact sum_mul_apply_eq_zero Gnew C hC p
   · rw [opE_apply, ← sum_mul_apply_eq_zero BL C hC p]
-    refine Finset.sum_congr rfl fun q _ => ?_
-    by_cases hq : S.sub q = t
-    · rw [hA p q (by rw [hq]; exact hp)]
-    · rw [hv q hq, mul_zero, mul_zero]
+    exact sum_mul_congr_of_support hv fun q hq => hA p q (by rw [hq]; exact hp)
 
 /-- The samples carry nothing of a hidden state. -/
 theorem Hidden.inner_coupling {A : Matrix (Fin n) (Fin n) ℝ} {t : κ}
@@ -123,12 +130,8 @@ theorem Hidden.inner_coupling {A : Matrix (Fin n) (Fin n) ℝ} {t : κ}
 /-- A hidden state of `t` does not act on another subsystem `s` to first order. -/
 theorem Hidden.inner_A {A : Matrix (Fin n) (Fin n) ℝ} {s t : κ} (hst : s ≠ t)
     {x v : EuclideanSpace ℝ (Fin n)} (hx : ∀ p, S.sub p ≠ s → x p = 0)
-    (hv : S.Hidden A t v) : ⟪x, opE A v⟫ = 0 := by
-  rw [inner_eq_sum]
-  refine Finset.sum_eq_zero fun p _ => ?_
-  by_cases hp : S.sub p = t
-  · rw [hx p (by rw [hp]; exact hst.symm), zero_mul]
-  · rw [hv.hA p hp, mul_zero]
+    (hv : S.Hidden A t v) : ⟪x, opE A v⟫ = 0 :=
+  inner_eq_zero_of_support hst hx hv.hA
 
 /-- On the image `A v` of a hidden state of `t`, the signs `ς_s` are the constant `ς_{st}`. -/
 theorem Hidden.sgn_apply {A : Matrix (Fin n) (Fin n) ℝ} {t : κ}
@@ -173,26 +176,19 @@ theorem Hidden.left {A : Matrix (Fin n) (Fin n) ℝ}
     ∑ p, v p * A p q = 0 := by
   have h := hv.hA q hq
   rw [opE_apply] at h
-  have e : ∑ p, v p * A p q = -∑ p, A q p * v p := by
-    rw [← Finset.sum_neg_distrib]
-    refine Finset.sum_congr rfl fun p _ => ?_
-    by_cases hp : S.sub p = t
-    · rw [hskew q p (by rw [hp]; exact hq)]
-      ring
-    · rw [hv.supp p hp]
-      ring
-  rw [e, h, neg_zero]
+  have e : ∑ p, A p q * v p = ∑ p, -A q p * v p :=
+    sum_mul_congr_of_support hv.supp fun p hp => hskew q p (by rw [hp]; exact hq)
+  rw [Finset.sum_congr rfl fun p _ => mul_comm (v p) (A p q), e]
+  simp only [neg_mul, Finset.sum_neg_distrib, h, neg_zero]
 
 /-- A hidden state of `t` is not driven by another subsystem `s` to first order. -/
 theorem Hidden.inner_A_left {A : Matrix (Fin n) (Fin n) ℝ}
     (hskew : ∀ p q, S.sub p ≠ S.sub q → A q p = -A p q) {s t : κ} (hst : s ≠ t)
     {x v : EuclideanSpace ℝ (Fin n)} (hx : ∀ p, S.sub p ≠ s → x p = 0)
     (hv : S.Hidden A t v) : ⟪v, opE A x⟫ = 0 := by
-  rw [inner_opE_eq_sum_col]
-  refine Finset.sum_eq_zero fun q _ => ?_
-  by_cases hq : S.sub q = t
-  · rw [hx q (by rw [hq]; exact hst.symm), mul_zero]
-  · rw [hv.left hskew hq, zero_mul]
+  rw [real_inner_comm, ← neg_eq_zero,
+    ← S.inner_opE_skew hskew hx fun r hr => hv.supp r (by rw [hr]; exact hst),
+    hv.inner_A hst hx]
 
 /-- In the rows of a hidden state of `t`, `A ς_t A = -A A`: only the subsystem `t` itself
 contributes, with the sign `-1`. -/

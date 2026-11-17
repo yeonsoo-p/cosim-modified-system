@@ -30,22 +30,6 @@ namespace CoSimFoundations
 
 variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
 
-/-- **Symmetric transfer, on the defect.** -/
-theorem abs_sym_pair_le (D : E →L[ℝ] E) {e₁ e₂ : E} (h1 : ‖e₁‖ = 1) (h2 : ‖e₂‖ = 1)
-    (h12 : ⟪e₁, e₂⟫ = 0) :
-    |⟪e₁, (D - 1) e₂⟫ + ⟪e₂, (D - 1) e₁⟫| ≤ (‖D‖ - 1) + ‖D - 1‖ := by
-  obtain ⟨hp, hm⟩ := norm_add_sq_of_orthonormal h1 h2 h12
-  have qp := abs_le.1 (abs_inner_sub_one_self_le D (e₁ + e₂))
-  have qm := abs_le.1 (abs_inner_sub_one_self_le D (e₁ - e₂))
-  have dp := sq_add_inner_sub_one_le D (e₁ + e₂)
-  have dm := sq_add_inner_sub_one_le D (e₁ - e₂)
-  rw [hp] at qp dp
-  rw [hm] at qm dm
-  rw [inner_add_sub_one] at qp dp
-  rw [inner_sub_sub_one] at qm dm
-  rw [abs_le]
-  constructor <;> linarith [qp.1, qm.1]
-
 /-- **Symmetric transfer, against the reference** (`link_tradeoff` without its zero). -/
 theorem pair_gain (D U : E →L[ℝ] E) {e₁ e₂ : E} (h1 : ‖e₁‖ = 1) (h2 : ‖e₂‖ = 1)
     (h12 : ⟪e₁, e₂⟫ = 0) :
@@ -116,9 +100,7 @@ theorem sq_add_sq_compression_le (D : E →L[ℝ] E) {e₁ e₂ : E} (h1 : ‖e�
   have c2 : ⟪e₂, (D - 1) (t • e₁ + e₂)⟫ = ⟪e₂, (D - 1) e₂⟫ := by
     rw [map_add, map_smul, inner_add_right, real_inner_smul_right, hb, mul_zero, zero_add]
   have hB := inner_sq_add_inner_sq_le h1 h2 h12 ((D - 1) (t • e₁ + e₂))
-  have hN : ‖(D - 1) (t • e₁ + e₂)‖ ^ 2 ≤ ‖D - 1‖ ^ 2 * ‖t • e₁ + e₂‖ ^ 2 := by
-    rw [← mul_pow]
-    exact pow_le_pow_left₀ (norm_nonneg _) ((D - 1).le_opNorm _) 2
+  have hN := norm_apply_sq_le (D - 1) (t • e₁ + e₂)
   rw [c1, c2] at hB
   rw [hv] at hN
   linarith
@@ -172,11 +154,8 @@ theorem one_sided_gain (D : E →L[ℝ] E) {e₁ e₂ : E} (h1 : ‖e₁‖ = 1)
     (h12 : ⟪e₁, e₂⟫ = 0) (hb : ⟪e₂, (D - 1) e₁⟫ = 0) :
     |⟪e₁, (D - 1) e₂⟫| / 2 -
         Real.sqrt (‖D - 1‖ * (‖D - 1‖ - |⟪e₁, (D - 1) e₂⟫|)) ≤ ‖D‖ - 1 := by
-  obtain ⟨hp, hm⟩ := norm_add_sq_of_orthonormal h1 h2 h12
-  have dp := sq_add_inner_sub_one_le D (e₁ + e₂)
-  have dm := sq_add_inner_sub_one_le D (e₁ - e₂)
-  rw [hp, inner_add_sub_one, hb] at dp
-  rw [hm, inner_sub_sub_one, hb] at dm
+  obtain ⟨⟨-, dp, -⟩, -, dm, -⟩ := form_pair_bounds D h1 h2 h12
+  rw [hb] at dp dm
   exact one_sided_real (norm_nonneg _) (abs_inner_sub_one_le D h1 h1)
     (sq_add_sq_compression_le D h1 h2 h12 hb) (by linarith) (by linarith)
 

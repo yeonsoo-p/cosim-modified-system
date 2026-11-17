@@ -32,24 +32,37 @@ private theorem le_of_ofReal_mul_le {a b : ℝ} (ha : 0 ≤ a) (hb : 0 ≤ b) {c
     ENNReal.toReal_ofReal hb] at h1
   exact le_of_mul_le_mul_right h1 (ENNReal.toReal_pos hc0 hct)
 
-/-- **Largest stretch bounds the determinant:** `|det T| ≤ ‖T‖ ^ n`. -/
-theorem abs_det_le_opNorm_pow (T : V →L[ℝ] V) :
-    |LinearMap.det (T : V →ₗ[ℝ] V)| ≤ ‖T‖ ^ finrank ℝ V := by
+/-- **The determinant by volume.** A linear map scales Haar measure by `|det T|`, and the ball of
+radius `r ≥ 0` has `r ^ n` times the volume of the unit ball. So if the image of the unit ball
+lies in the ball of radius `r`, then `|det T| ≤ r ^ n`, and if it contains that ball, then
+`r ^ n ≤ |det T|`. -/
+theorem abs_det_compare_of_image_closedBall (T : V →L[ℝ] V) {r : ℝ} (hr : 0 ≤ r) :
+    (T '' closedBall (0 : V) 1 ⊆ closedBall (0 : V) r →
+        |LinearMap.det (T : V →ₗ[ℝ] V)| ≤ r ^ finrank ℝ V) ∧
+      (closedBall (0 : V) r ⊆ T '' closedBall (0 : V) 1 →
+        r ^ finrank ℝ V ≤ |LinearMap.det (T : V →ₗ[ℝ] V)|) := by
   let _ : MeasurableSpace V := borel V
   have : BorelSpace V := ⟨rfl⟩
   let μ : Measure V := Measure.addHaar
   have hc0 : μ (closedBall (0 : V) 1) ≠ 0 := (measure_closedBall_pos μ 0 one_pos).ne'
   have hct : μ (closedBall (0 : V) 1) ≠ ⊤ := measure_closedBall_lt_top.ne
-  have hsub : T '' closedBall (0 : V) 1 ⊆ closedBall (0 : V) ‖T‖ := by
-    rintro _ ⟨x, hx, rfl⟩
-    rw [mem_closedBall_zero_iff] at hx ⊢
-    calc ‖T x‖ ≤ ‖T‖ * ‖x‖ := T.le_opNorm x
-      _ ≤ ‖T‖ * 1 := by gcongr
-      _ = ‖T‖ := mul_one _
-  have h := measure_mono (μ := μ) hsub
-  rw [Measure.addHaar_image_continuousLinearMap,
-    Measure.addHaar_closedBall' μ (0 : V) (norm_nonneg T)] at h
-  exact le_of_ofReal_mul_le (abs_nonneg _) (pow_nonneg (norm_nonneg T) _) hc0 hct h
+  refine ⟨fun hsub => ?_, fun hsub => ?_⟩
+  · have h := measure_mono (μ := μ) hsub
+    rw [Measure.addHaar_image_continuousLinearMap, Measure.addHaar_closedBall' μ (0 : V) hr] at h
+    exact le_of_ofReal_mul_le (abs_nonneg _) (pow_nonneg hr _) hc0 hct h
+  · have h := measure_mono (μ := μ) hsub
+    rw [Measure.addHaar_image_continuousLinearMap, Measure.addHaar_closedBall' μ (0 : V) hr] at h
+    exact le_of_ofReal_mul_le (pow_nonneg hr _) (abs_nonneg _) hc0 hct h
+
+/-- **Largest stretch bounds the determinant:** `|det T| ≤ ‖T‖ ^ n`. -/
+theorem abs_det_le_opNorm_pow (T : V →L[ℝ] V) :
+    |LinearMap.det (T : V →ₗ[ℝ] V)| ≤ ‖T‖ ^ finrank ℝ V := by
+  refine (abs_det_compare_of_image_closedBall T (norm_nonneg T)).1 ?_
+  rintro _ ⟨x, hx, rfl⟩
+  rw [mem_closedBall_zero_iff] at hx ⊢
+  calc ‖T x‖ ≤ ‖T‖ * ‖x‖ := T.le_opNorm x
+    _ ≤ ‖T‖ * 1 := by gcongr
+    _ = ‖T‖ := mul_one _
 
 /-- **Least stretch bounds the determinant:** if `m ‖x‖ ≤ ‖T x‖` for all `x`, then
 `m ^ n ≤ |det T|`. -/
@@ -63,11 +76,6 @@ theorem pow_le_abs_det_of_le (T : V →L[ℝ] V) {m : ℝ} (hm : 0 ≤ m)
         exact Subsingleton.elim _ _
       simp [h0, this]
     · simp [zero_pow hpos.ne']
-  let _ : MeasurableSpace V := borel V
-  have : BorelSpace V := ⟨rfl⟩
-  let μ : Measure V := Measure.addHaar
-  have hc0 : μ (closedBall (0 : V) 1) ≠ 0 := (measure_closedBall_pos μ 0 one_pos).ne'
-  have hct : μ (closedBall (0 : V) 1) ≠ ⊤ := measure_closedBall_lt_top.ne
   have hinj : Function.Injective (T : V →ₗ[ℝ] V) := by
     rw [← LinearMap.ker_eq_bot, LinearMap.ker_eq_bot']
     intro x hx
@@ -78,17 +86,12 @@ theorem pow_le_abs_det_of_le (T : V →L[ℝ] V) {m : ℝ} (hm : 0 ≤ m)
     exact norm_le_zero_iff.1 this
   have hsurj : Function.Surjective (T : V →ₗ[ℝ] V) :=
     LinearMap.surjective_of_injective hinj
-  have hsub : closedBall (0 : V) m ⊆ T '' closedBall (0 : V) 1 := by
-    intro y hy
-    obtain ⟨x, rfl⟩ := hsurj y
-    refine ⟨x, ?_, rfl⟩
-    rw [mem_closedBall_zero_iff] at hy ⊢
-    have h1 : m * ‖x‖ ≤ m := (h x).trans hy
-    nlinarith [norm_nonneg x]
-  have h2 := measure_mono (μ := μ) hsub
-  rw [Measure.addHaar_image_continuousLinearMap,
-    Measure.addHaar_closedBall' μ (0 : V) hm'.le] at h2
-  exact le_of_ofReal_mul_le (pow_nonneg hm'.le _) (abs_nonneg _) hc0 hct h2
+  refine (abs_det_compare_of_image_closedBall T hm'.le).2 fun y hy => ?_
+  obtain ⟨x, rfl⟩ := hsurj y
+  refine ⟨x, ?_, rfl⟩
+  rw [mem_closedBall_zero_iff] at hy ⊢
+  have h1 : m * ‖x‖ ≤ m := (h x).trans hy
+  nlinarith [norm_nonneg x]
 
 /-- **Accuracy bounds the largest stretch:** `‖T‖ ≤ 1 + ‖T - 1‖`. -/
 theorem opNorm_le_one_add (T : V →L[ℝ] V) : ‖T‖ ≤ 1 + ‖T - 1‖ := by

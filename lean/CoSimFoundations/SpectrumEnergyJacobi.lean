@@ -54,35 +54,6 @@ section Run
 
 variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
 
-omit [CompleteSpace E] in
-/-- **The pair trade-off with two-sided bounds on the squared stretches.** If
-`lo ‖x‖² ≤ ‖D x‖² ≤ hi ‖x‖²` for every `x`, then `|u_X| - α (η + α/2) ≤ (hi - lo)/2`, with
-`u_X = ⟪e₁, (U - X) e₂⟫ + ⟪e₂, (U - X) e₁⟫`, `X = D ∘ U`. (`pair_tradeoff` is the case
-`lo = m²`, `hi = ‖D‖²`.) -/
-theorem pair_tradeoff_sq (D U : E →L[ℝ] E) {e₁ e₂ : E} (h1 : ‖e₁‖ = 1) (h2 : ‖e₂‖ = 1)
-    (h12 : ⟪e₁, e₂⟫ = 0) {lo hi : ℝ} (hlo : ∀ x, lo * ‖x‖ ^ 2 ≤ ‖D x‖ ^ 2)
-    (hhi : ∀ x, ‖D x‖ ^ 2 ≤ hi * ‖x‖ ^ 2) :
-    |⟪e₁, U e₂ - D (U e₂)⟫ + ⟪e₂, U e₁ - D (U e₁)⟫| -
-        ‖D - 1‖ * ((‖U e₁ - e₁‖ + ‖U e₂ - e₂‖) + ‖D - 1‖ / 2) ≤
-      (hi - lo) / 2 := by
-  have key : ⟪e₁, U e₂ - D (U e₂)⟫ + ⟪e₂, U e₁ - D (U e₁)⟫ =
-      ⟪(D - 1) e₁, (D - 1) e₂⟫ - ⟪D e₁, D e₂⟫ - ⟪e₁, (D - 1) (U e₂ - e₂)⟫ -
-        ⟪e₂, (D - 1) (U e₁ - e₁)⟫ := by
-    have c1 : ⟪D e₁, e₂⟫ = ⟪e₂, D e₁⟫ := real_inner_comm _ _
-    have c2 : ⟪e₂, e₁⟫ = 0 := by rw [real_inner_comm]; exact h12
-    simp only [sub_apply, one_apply_eq_self, map_sub, inner_sub_left, inner_sub_right]
-    linarith
-  have hlo' : ∀ x, 0 * ‖x‖ ^ 2 ≤ ‖(D - 1) x‖ ^ 2 := fun x => by
-    rw [zero_mul]; positivity
-  have hhi' : ∀ x, ‖(D - 1) x‖ ^ 2 ≤ ‖D - 1‖ ^ 2 * ‖x‖ ^ 2 := fun x => by
-    rw [← mul_pow]; exact pow_le_pow_left₀ (norm_nonneg _) ((D - 1).le_opNorm x) 2
-  have hD := abs_le.1 (abs_inner_apply_le_half_spread D h1 h2 h12 hlo hhi)
-  have hN := abs_le.1 (abs_inner_apply_le_half_spread (D - 1) h1 h2 h12 hlo' hhi')
-  have r1 := abs_le.1 (abs_inner_sub_one_apply_le D h1 (U e₂ - e₂))
-  have r2 := abs_le.1 (abs_inner_sub_one_apply_le D h2 (U e₁ - e₁))
-  rw [key, sub_le_iff_le_add, abs_le]
-  constructor <;> linarith [hD.1, hD.2, hN.1, hN.2, r1.1, r1.2, r2.1, r2.2]
-
 /-- **One step changes the energy of a state by at most `‖X† X - 1‖` times it:**
 `|‖X y‖² - ‖y‖²| ≤ ‖X† X - 1‖ ‖y‖²`. -/
 theorem abs_norm_sq_apply_sub_le (X : E →L[ℝ] E) (y : E) :
@@ -106,14 +77,9 @@ theorem pair_tradeoff_lossless (X U V : E →L[ℝ] E) (hU : ∀ x, ‖U x‖ = 
     |⟪e₁, U e₂ - X e₂⟫ + ⟪e₂, U e₁ - X e₁⟫| -
         ‖X * V - 1‖ * ((‖U e₁ - e₁‖ + ‖U e₂ - e₂‖) + ‖X * V - 1‖ / 2) ≤
       ‖X† * X - 1‖ := by
-  have hUVx : ∀ x, U (V x) = x := fun x => by
-    have h := DFunLike.congr_fun hUV x
-    rwa [mul_apply_eq_comp, one_apply_eq_self] at h
-  have hVUx : ∀ x, V (U x) = x := fun x => by
-    have h := DFunLike.congr_fun hVU x
-    rwa [mul_apply_eq_comp, one_apply_eq_self] at h
-  have hV : ∀ x, ‖V x‖ = ‖x‖ := fun x => by rw [← hU (V x), hUVx]
-  have hDU : ∀ x, (X * V) (U x) = X x := fun x => by rw [mul_apply_eq_comp, hVUx]
+  have hV : ∀ x, ‖V x‖ = ‖x‖ := fun x => by rw [← hU (V x), left_inverse_apply hUV]
+  have hDU : ∀ x, (X * V) (U x) = X x := fun x => by
+    rw [mul_apply_eq_comp, left_inverse_apply hVU]
   have hbd : ∀ y, |‖(X * V) y‖ ^ 2 - ‖y‖ ^ 2| ≤ ‖X† * X - 1‖ * ‖y‖ ^ 2 := fun y => by
     rw [mul_apply_eq_comp, ← hV y]
     exact abs_norm_sq_apply_sub_le X (V y)

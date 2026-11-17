@@ -4,9 +4,10 @@ stored and energy created": the signed coupling as a
 commutator and on the eigenvalue equation `eq:tree`).
 
 **Offsets.** `S.IsOffset q`: real numbers `q_s` with `q_s - q_t = ς_st` for every pair of
-partners `s ≠ t`. `S.IsStageOffset p`: integers `p_s` such that every pair of partners runs at
-different stages and `p` is larger by one at the partner that runs later (the hypothesis of
-`det_sq_sub_X_of_potential`; the stage potential of `TreeDeterminant` on the partners). An
+partners `s ≠ t`. `S.IsStageOffset p` (of `TreeDeterminantScheme`): integers `p_s` such that
+every pair of partners runs at different stages and `p` is larger by one at the partner that runs
+later (the hypothesis of `det_sq_sub_X_of_potential`; the stage potential of `TreeDeterminant` on
+the partners). An
 integer stage offset is an offset (`IsStageOffset.isOffset`); it exists if the partners are
 linked in an acyclic graph and no two partners share a stage (`exists_isStageOffset`); in a
 reversed assignment of stages `-p` is one (`IsStageOffset.restage`).
@@ -19,14 +20,16 @@ partners: `A_ς = P A - A P`. No hypothesis on the ports.
 `dotProduct_signedCoupling_eq_zero`). If `wᵀ A = μ wᵀ` and `A v = μ v` (over a field `𝕜 ⊇ ℝ`;
 `w` is the row vector `w^*` of the paper), then `wᵀ A_ς v = wᵀ (P A - A P) v = (μ - μ) wᵀ P v = 0`.
 
-**The eigenvalue equation with offsets alone** (`det_sq_sub_zoh_X_of_offset`,
-`exists_eigenvector_X_iff_of_offset`, `charpoly_zoh_restage_eq_of_offset`). The paper's
+**The eigenvalue equation with offsets alone** (`det_sq_sub_X_of_offset`,
+`exists_eigenvector_X_iff_of_offset`; `det_sq_sub_zoh_X_of_offset` and
+`charpoly_zoh_restage_eq_of_offset` of `TreeDeterminantScheme`). The paper's
 `det(ξ - F - √ξ G C) = 0` for a scheme with one held sample needs only a stage offset, no
 acyclic graph: `det_sq_sub_X_of_potential` of `TreeDeterminantScheme` is that statement
 (`det(s² - X) = det(s² - F - s (N + M))`); here it is restated with the predicate
-(`det_sq_sub_X_of_offset`), for the zero-order hold, as an equivalence for eigenvectors, and as
-the equality of the characteristic polynomials of the zero-order holds in two assignments of
-stages that both have a stage offset.
+(`det_sq_sub_X_of_offset`) and as an equivalence for eigenvectors; for the zero-order hold and
+as the equality of the characteristic polynomials of the zero-order holds in two assignments of
+stages that both have a stage offset it is stated in `TreeDeterminantScheme`, where the
+statements on a tree are derived from it.
 
 **(c) `X(H)` and `X(-H)⁻¹` have the same characteristic polynomial**
 (`charpoly_zoh_eq_charpoly_inv_neg`), for the zero-order hold with a stage offset: `X(-H)⁻¹` is
@@ -57,12 +60,6 @@ variable {n : ℕ} {κ : Type*} (S : HeldScheme n κ)
 /-- **Offsets of the subsystems:** `q_s - q_t = ς_st` for every pair of partners `s ≠ t`
 (`ς_st = +1` if `t` runs at an earlier stage than `s`, else `-1`). -/
 def IsOffset (q : κ → ℝ) : Prop := ∀ s t, s ≠ t → S.partner s t → q s - q t = S.sg s t
-
-/-- **A stage offset:** integers `p_s` such that every pair of partners runs at different stages
-and `p` is larger by one at the partner that runs later. -/
-def IsStageOffset (p : κ → ℤ) : Prop :=
-  ∀ s t, S.partner s t → (S.stage t < S.stage s ∧ p s = p t + 1) ∨
-    (S.stage s < S.stage t ∧ p t = p s + 1)
 
 variable {S}
 
@@ -102,14 +99,8 @@ finitely many subsystems and no two partners share a stage, there is a stage off
 theorem exists_isStageOffset [Fintype κ] {Gr : SimpleGraph κ} (hGr : Gr.IsAcyclic)
     (hpart : ∀ s t, S.partner s t → Gr.Adj s t)
     (hns : ∀ s t, s ≠ t → S.partner s t → S.stage s ≠ S.stage t) :
-    ∃ p : κ → ℤ, S.IsStageOffset p := by
-  obtain ⟨p, hp⟩ := exists_stagePotential hGr S.stage
-  refine ⟨p, fun a b hab => ?_⟩
-  have hadj := hpart a b hab
-  have hne := hns a b (Gr.ne_of_adj hadj) hab
-  rcases lt_or_gt_of_ne hne with h | h
-  · exact Or.inr ⟨h, hp b a hadj.symm h⟩
-  · exact Or.inl ⟨h, hp a b hadj h⟩
+    ∃ p : κ → ℤ, S.IsStageOffset p :=
+  S.exists_potential_of_isAcyclic hGr hpart hns
 
 /-- The block-diagonal matrix of the offsets: `q_s` on the states of subsystem `s`. -/
 def offsetP (q : κ → ℝ) : Matrix (Fin n) (Fin n) ℝ := diagonal fun r => q (S.sub r)
@@ -144,34 +135,6 @@ theorem exists_eigenvector_X_iff_of_offset {p : κ → ℤ} (hp : S.IsStageOffse
 end Field
 
 variable [DecidableEq κ]
-
-/-- **The eigenvalue equation of the zero-order hold, with a stage offset** (the paper, equation
-`eq:tree`): over every field `𝕜 ⊇ ℝ` and for every `s : 𝕜`,
-`det(s² - X) = det(s² - e^{H A₀} - s G° C)`, `G° C = (∫₀ᴴ e^{τ A₀} dτ) A_c`. -/
-theorem det_sq_sub_zoh_X_of_offset {𝕜 : Type*} [Field 𝕜] [Algebra ℝ 𝕜] {p : κ → ℤ}
-    (hp : S.IsStageOffset p) {A : Matrix (Fin n) (Fin n) ℝ}
-    (hA : ∀ p q, S.sub p ≠ S.sub q → ¬ S.partner (S.sub p) (S.sub q) → A p q = 0) (H : ℝ)
-    (s : 𝕜) :
-    (s ^ 2 • (1 : Matrix (Fin n) (Fin n) 𝕜) - (S.zoh A hA H).X.map (algebraMap ℝ 𝕜)).det =
-      (s ^ 2 • (1 : Matrix (Fin n) (Fin n) 𝕜) -
-        (NormedSpace.exp (H • S.blockDiag A)).map (algebraMap ℝ 𝕜) -
-        s • (S.zohCoupling A H).map (algebraMap ℝ 𝕜)).det := by
-  have h := (S.zoh A hA H).det_sq_sub_X_of_potential (𝕜 := 𝕜) p hp s
-  rw [add_comm, S.zoh_M_add_N] at h
-  exact h
-
-/-- **Two orders with stage offsets have the same eigenvalues** (the paper, Section "Energy stored
-and energy created"): if the stages of `S` and the stages `st` both have a stage offset, the
-one-step maps of the zero-order hold in the two assignments have the same characteristic
-polynomial, for every macro step `H`. -/
-theorem charpoly_zoh_restage_eq_of_offset {p p' : κ → ℤ} (hp : S.IsStageOffset p)
-    {st : κ → ℕ} (hp' : (S.restage st).IsStageOffset p') {A : Matrix (Fin n) (Fin n) ℝ}
-    (hA : ∀ p q, S.sub p ≠ S.sub q → ¬ S.partner (S.sub p) (S.sub q) → A p q = 0) (H : ℝ) :
-    ((S.restage st).zoh A hA H).X.charpoly = (S.zoh A hA H).X.charpoly :=
-  charpoly_eq_of_det_sq_sub_eq fun s => by
-    rw [(S.restage st).det_sq_sub_zoh_X_of_offset hp' hA H s,
-      S.det_sq_sub_zoh_X_of_offset hp hA H s]
-    rfl
 
 /-- **`X(H)` and `X(-H)⁻¹` have the same characteristic polynomial:** for the zero-order hold of
 finitely many subsystems with a stage offset, the one-step map with the macro step `H` and the

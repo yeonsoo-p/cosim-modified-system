@@ -178,6 +178,14 @@ variable {E Ei : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpac
   {ι : Type*} [Fintype ι] {Y : ι → Type*} [∀ k, NormedAddCommGroup (Y k)]
   [∀ k, NormedSpace ℝ (Y k)]
 
+/-- The constant `ϱ = Σ_k r k (‖V‖ / (1 - α)) ^ r k ‖G k ∘ C k‖` of the memory bound is
+nonnegative for `α = ‖D - 1‖ < 1`. -/
+theorem memory_sum_nonneg (D V : E →L[ℝ] E) (hα : ‖D - 1‖ < 1) (G : ∀ k, Y k →L[ℝ] Ei)
+    (C : ∀ k, E →L[ℝ] Y k) (r : ι → ℕ) :
+    0 ≤ ∑ k, (r k : ℝ) * (‖V‖ / (1 - ‖D - 1‖)) ^ r k * ‖(G k).comp (C k)‖ := by
+  have hpos : 0 < 1 - ‖D - 1‖ := sub_pos.2 hα
+  exact Finset.sum_nonneg fun k _ => by positivity
+
 /-- **Corollary 4.8 (memory), the bound for the rule at hand.** A Jacobi scheme with held
 samples: `U` the reference step with left inverse `V`, `P = D * U` the step of the scheme with
 `α = ‖D - 1‖ < 1` and right inverse `P'`; the piece of information `k` is the sample
@@ -191,15 +199,13 @@ theorem memory_visibility_bound (Pr : E →L[ℝ] Ei) (hPr : ‖Pr‖ ≤ 1) (D 
     ‖Pr.comp U - F.comp Pr - ∑ k, (G k).comp ((C k).comp (V ^ r k))‖ ≤
       ‖D - 1‖ * (‖U‖ +
         ∑ k, (r k : ℝ) * (‖V‖ / (1 - ‖D - 1‖)) ^ r k * ‖(G k).comp (C k)‖) := by
-  have hpos : 0 < 1 - ‖D - 1‖ := sub_pos.2 hα
   rcases subsingleton_or_nontrivial E with hE | hE
   · -- on the trivial space everything vanishes
     have h0 : Pr.comp U - F.comp Pr - ∑ k, (G k).comp ((C k).comp (V ^ r k)) = 0 :=
       Subsingleton.elim _ _
     rw [h0, norm_zero]
-    have hsum : 0 ≤ ∑ k, (r k : ℝ) * (‖V‖ / (1 - ‖D - 1‖)) ^ r k * ‖(G k).comp (C k)‖ :=
-      Finset.sum_nonneg fun k _ => by positivity
-    positivity
+    exact mul_nonneg (norm_nonneg _)
+      (add_nonneg (norm_nonneg _) (memory_sum_nonneg D V hα G C r))
   · have hstep' : Pr.comp (D * U) =
         F.comp Pr + ∑ k, ((G k).comp (C k)).comp (P' ^ r k) := hstep
     have hb := visibility_bound (Y := fun _ => E) Pr (D * U) U F
@@ -240,10 +246,8 @@ theorem memory_bound_div (Pr : E →L[ℝ] Ei) (hPr : ‖Pr‖ ≤ 1) (D U V P' 
     {f : ℝ} (hf : f ≤ ‖Pr.comp U - F.comp Pr - ∑ k, (G k).comp ((C k).comp (V ^ r k))‖) :
     f / (‖U‖ + ∑ k, (r k : ℝ) * (‖V‖ / (1 - ‖D - 1‖)) ^ r k * ‖(G k).comp (C k)‖) ≤
       ‖D - 1‖ := by
-  have hpos : 0 < 1 - ‖D - 1‖ := sub_pos.2 hα
-  have hsum : 0 ≤ ∑ k, (r k : ℝ) * (‖V‖ / (1 - ‖D - 1‖)) ^ r k * ‖(G k).comp (C k)‖ :=
-    Finset.sum_nonneg fun k _ => by positivity
-  exact div_le_of_le_mul₀ (add_nonneg (norm_nonneg _) hsum) (norm_nonneg _)
+  exact div_le_of_le_mul₀ (add_nonneg (norm_nonneg _) (memory_sum_nonneg D V hα G C r))
+    (norm_nonneg _)
     (memory_bound Pr hPr D U V P' hVU hα hP' F G C r hstep hf)
 
 /-- **Inequality (21) as printed,** with the prefactor `1 / (1 - α)` in `ϱ`:
@@ -256,14 +260,11 @@ theorem memory_bound_printed (Pr : E →L[ℝ] Ei) (hPr : ‖Pr‖ ≤ 1) (D U V
     {f : ℝ} (hf : f ≤ ‖Pr.comp U - F.comp Pr - ∑ k, (G k).comp ((C k).comp (V ^ r k))‖) :
     f ≤ ‖D - 1‖ * (‖U‖ + (1 - ‖D - 1‖)⁻¹ *
       ∑ k, (r k : ℝ) * (‖V‖ / (1 - ‖D - 1‖)) ^ r k * ‖(G k).comp (C k)‖) := by
-  have hpos : 0 < 1 - ‖D - 1‖ := sub_pos.2 hα
-  have hsum : 0 ≤ ∑ k, (r k : ℝ) * (‖V‖ / (1 - ‖D - 1‖)) ^ r k * ‖(G k).comp (C k)‖ :=
-    Finset.sum_nonneg fun k _ => by positivity
   have hinv : 1 ≤ (1 - ‖D - 1‖)⁻¹ :=
-    (one_le_inv₀ hpos).2 (by linarith [norm_nonneg (D - 1)])
+    (one_le_inv₀ (sub_pos.2 hα)).2 (by linarith [norm_nonneg (D - 1)])
   refine (memory_bound Pr hPr D U V P' hVU hα hP' F G C r hstep hf).trans ?_
   refine mul_le_mul_of_nonneg_left (add_le_add le_rfl ?_) (norm_nonneg _)
-  exact le_mul_of_one_le_left hsum hinv
+  exact le_mul_of_one_le_left (memory_sum_nonneg D V hα G C r) hinv
 
 end Visibility
 

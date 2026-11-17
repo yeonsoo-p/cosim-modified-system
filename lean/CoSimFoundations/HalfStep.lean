@@ -63,6 +63,29 @@ open OneStep
 
 variable {n : ℕ}
 
+/-- From the matrix elements to the spectral norm: if `|⟪x, W y⟫| ≤ K ‖x‖ ‖y‖` for all `x`, `y`,
+then `‖W‖ ≤ K`. -/
+theorem norm_opE_le_of_abs_inner_le {W : Matrix (Fin n) (Fin n) ℝ} {K : ℝ} (hK : 0 ≤ K)
+    (h : ∀ x y : EuclideanSpace ℝ (Fin n), |⟪x, opE W y⟫| ≤ K * (‖x‖ * ‖y‖)) :
+    ‖opE W‖ ≤ K := by
+  refine ContinuousLinearMap.opNorm_le_of_re_inner_le hK fun u v hu hv => ?_
+  have h1 := h v u
+  rw [hu, hv, mul_one, mul_one] at h1
+  rw [RCLike.re_to_real, real_inner_comm]
+  exact (le_abs_self _).trans h1
+
+/-- The spectral norm is submultiplicative: `‖A B‖ ≤ ‖A‖ ‖B‖`. -/
+theorem norm_opE_mul_le (A B : Matrix (Fin n) (Fin n) ℝ) :
+    ‖opE (A * B)‖ ≤ ‖opE A‖ * ‖opE B‖ := by
+  rw [opE_mul]
+  exact norm_mul_le _ _
+
+/-- A factor of spectral norm at most one on the right does not increase the spectral norm:
+`‖A D‖ ≤ ‖A‖` if `‖D‖ ≤ 1`. -/
+theorem norm_opE_mul_le_of_norm_le_one (A : Matrix (Fin n) (Fin n) ℝ)
+    {D : Matrix (Fin n) (Fin n) ℝ} (hD : ‖opE D‖ ≤ 1) : ‖opE (A * D)‖ ≤ ‖opE A‖ :=
+  (norm_opE_mul_le A D).trans (mul_le_of_le_one_right (norm_nonneg _) hD)
+
 namespace HeldScheme
 
 section Bound
@@ -128,6 +151,22 @@ theorem blockDiag_add_coupling (A : Matrix (Fin n) (Fin n) ℝ) :
   rw [coupling]
   abel
 
+/-! ### The signs of the other subsystems -/
+
+/-- The signs of the other subsystems form a diagonal matrix of spectral norm at most one. -/
+theorem norm_opE_osgn_le (s : κ) : ‖opE (S.osgn s)‖ ≤ 1 :=
+  norm_opE_diagonal_le _ zero_le_one fun i => by
+    by_cases h1 : S.sub i = s
+    · simp [h1]
+    · by_cases h2 : S.stage (S.sub i) < S.stage s <;> simp [sg, h1, h2]
+
+/-- The entry of a product with the signs of the other subsystems in the middle:
+`(A osgn_s B)_{pq} = Σ_{r ∉ s} A_{pr} ς_{s, sub r} B_{rq}`. -/
+theorem mul_osgn_mul_apply (A B : Matrix (Fin n) (Fin n) ℝ) (s : κ) (p q : Fin n) :
+    (A * S.osgn s * B) p q =
+      ∑ r, A p r * (if S.sub r = s then 0 else S.sg s (S.sub r)) * B r q :=
+  mul_diagonal_mul_apply A B _ p q
+
 /-! ### The algebra of the normal form -/
 
 /-- In the rows of a subsystem `s`, `A ς_s A = A_ς A - A₀ A`: the sign of `s` on itself is `-1`. -/
@@ -144,6 +183,22 @@ theorem sgn_row (A : Matrix (Fin n) (Fin n) ℝ) (p q : Fin n) :
     ring
   · rw [ite_eq_right hr, ite_eq_right hr]
     ring
+
+/-- Between different subsystems that are not partners the entries of `A_ς A` are those of
+`A ς_s A`: the entry of `A₀ A` by which the two differ (`sgn_row`) vanishes, because `A` has no
+block between the two subsystems. -/
+theorem signedCoupling_mul_apply_eq_sgn {A : Matrix (Fin n) (Fin n) ℝ}
+    (hA : ∀ p q, S.sub p ≠ S.sub q → ¬ S.partner (S.sub p) (S.sub q) → A p q = 0) {p q : Fin n}
+    (hne : S.sub p ≠ S.sub q) (hnp : ¬ S.partner (S.sub p) (S.sub q)) :
+    (S.signedCoupling A * A) p q = (A * S.sgn (S.sub p) * A) p q := by
+  have h0 : (S.blockDiag A * A) p q = 0 := by
+    rw [Matrix.mul_apply]
+    refine Finset.sum_eq_zero fun r _ => ?_
+    rw [S.blockDiag_apply]
+    by_cases hr : S.sub p = S.sub r
+    · rw [hA r q (by rw [← hr]; exact hne) (by rw [← hr]; exact hnp), mul_zero]
+    · rw [ite_eq_right hr, zero_mul]
+  rw [S.sgn_row, h0, sub_zero]
 
 /-- `⟪x, A ς_s A y⟫ = ⟪x, A_ς A y⟫ - ⟪x, A₀ A y⟫` for `x` supported on the subsystem `s`. -/
 theorem inner_sgn_row (A : Matrix (Fin n) (Fin n) ℝ) {s : κ} {x : EuclideanSpace ℝ (Fin n)}
@@ -163,10 +218,7 @@ theorem inner_signedCoupling_row (A : Matrix (Fin n) (Fin n) ℝ) {s : κ}
     (y : EuclideanSpace ℝ (Fin n)) :
     ⟪x, opE (S.signedCoupling A * A) y⟫ = ⟪x, opE (A * S.osgn s * A) y⟫ := by
   refine inner_opE_congr_row hx y fun p q hp => ?_
-  have e : (A * S.osgn s * A) p q =
-      ∑ r, A p r * (if S.sub r = s then 0 else S.sg s (S.sub r)) * A r q :=
-    mul_diagonal_mul_apply A A _ p q
-  rw [e, Matrix.mul_apply]
+  rw [S.mul_osgn_mul_apply, Matrix.mul_apply]
   refine Finset.sum_congr rfl fun r _ => ?_
   rw [S.signedCoupling_apply, hp]
   by_cases hr : S.sub r = s
@@ -311,13 +363,9 @@ theorem abs_inner_opE_le_of_rows [Fintype κ] {W : Matrix (Fin n) (Fin n) ℝ} {
 theorem norm_opE_le_of_rows [Fintype κ] {W : Matrix (Fin n) (Fin n) ℝ} {K : ℝ} (hK : 0 ≤ K)
     (hrow : ∀ (s : κ) (x : EuclideanSpace ℝ (Fin n)), (∀ p, S.sub p ≠ s → x p = 0) →
       ∀ y : EuclideanSpace ℝ (Fin n), |⟪x, opE W y⟫| ≤ K * (‖x‖ * ‖y‖)) :
-    ‖opE W‖ ≤ Real.sqrt (Fintype.card κ) * K := by
-  refine ContinuousLinearMap.opNorm_le_of_re_inner_le (mul_nonneg (Real.sqrt_nonneg _) hK)
-    fun u v hu hv => ?_
-  have h1 := S.abs_inner_opE_le_of_rows hK hrow v u
-  rw [hu, hv, mul_one, mul_one] at h1
-  rw [RCLike.re_to_real, real_inner_comm]
-  exact (le_abs_self _).trans h1
+    ‖opE W‖ ≤ Real.sqrt (Fintype.card κ) * K :=
+  norm_opE_le_of_abs_inner_le (mul_nonneg (Real.sqrt_nonneg _) hK)
+    (S.abs_inner_opE_le_of_rows hK hrow)
 
 variable {S}
 

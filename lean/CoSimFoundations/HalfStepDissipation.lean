@@ -139,14 +139,21 @@ theorem signedCoupling_apply_of_skew {A : Matrix (Fin n) (Fin n) ℝ}
   · rw [ite_eq_right fun e => h e.symm, ite_eq_right h, hskew p q h]
     ring
 
+/-- The two rates of `k` vanish in the rows of the other subsystems. -/
+theorem opE_drive_apply_of_ne (A : Matrix (Fin n) (Fin n) ℝ) {k : κ}
+    (x : EuclideanSpace ℝ (Fin n)) {r : Fin n} (hr : S.sub r ≠ k) :
+    (opE (S.driveAfter A k) x) r = 0 ∧ (opE (S.driveOther A k) x) r = 0 := by
+  constructor <;> rw [opE_apply] <;> refine Finset.sum_eq_zero fun q _ => ?_
+  · rw [S.driveAfter_apply, ite_eq_right hr, zero_mul]
+  · rw [S.driveOther_apply, ite_eq_right hr, zero_mul]
+
 /-- In the rows of `k`, `A_c x = (a_k⁺ + a_k⁻) x`; the two rates vanish in the other rows. -/
 theorem opE_driveAfter_add_driveOther_apply (A : Matrix (Fin n) (Fin n) ℝ) (k : κ)
     (x : EuclideanSpace ℝ (Fin n)) (r : Fin n) :
     (opE (S.driveAfter A k) x) r + (opE (S.driveOther A k) x) r =
       if S.sub r = k then (opE (S.coupling A) x) r else 0 := by
-  rw [opE_apply, opE_apply, ← Finset.sum_add_distrib]
   by_cases hr : S.sub r = k
-  · rw [ite_eq_left hr, opE_apply]
+  · rw [opE_apply, opE_apply, ← Finset.sum_add_distrib, ite_eq_left hr, opE_apply]
     refine Finset.sum_congr rfl fun q _ => ?_
     rw [S.driveAfter_apply, S.driveOther_apply, ite_eq_left hr, ite_eq_left hr]
     by_cases h : S.stage k < S.stage (S.sub q)
@@ -154,10 +161,8 @@ theorem opE_driveAfter_add_driveOther_apply (A : Matrix (Fin n) (Fin n) ℝ) (k 
       ring
     · rw [ite_eq_right h, ite_eq_right h]
       ring
-  · rw [ite_eq_right hr]
-    refine Finset.sum_eq_zero fun q _ => ?_
-    rw [S.driveAfter_apply, S.driveOther_apply, ite_eq_right hr, ite_eq_right hr]
-    ring
+  · rw [ite_eq_right hr, (S.opE_drive_apply_of_ne A x hr).1,
+      (S.opE_drive_apply_of_ne A x hr).2, add_zero]
 
 /-- With power-conjugate ports, in the rows of `k`, `A_ςᵀ x = -(a_k⁺ - a_k⁻) x`. -/
 theorem opE_driveAfter_sub_driveOther_apply {A : Matrix (Fin n) (Fin n) ℝ}
@@ -165,9 +170,9 @@ theorem opE_driveAfter_sub_driveOther_apply {A : Matrix (Fin n) (Fin n) ℝ}
     (x : EuclideanSpace ℝ (Fin n)) (r : Fin n) :
     (opE (S.driveAfter A k) x) r - (opE (S.driveOther A k) x) r =
       if S.sub r = k then -(opE (S.signedCoupling A)ᵀ x) r else 0 := by
-  rw [opE_apply, opE_apply, ← Finset.sum_sub_distrib]
   by_cases hr : S.sub r = k
-  · rw [ite_eq_left hr, opE_apply, ← Finset.sum_neg_distrib]
+  · rw [opE_apply, opE_apply, ← Finset.sum_sub_distrib, ite_eq_left hr, opE_apply,
+      ← Finset.sum_neg_distrib]
     refine Finset.sum_congr rfl fun q _ => ?_
     have e : S.sg (S.sub q) (S.sub r) = if S.stage k < S.stage (S.sub q) then 1 else -1 := by
       rw [hr]
@@ -179,10 +184,8 @@ theorem opE_driveAfter_sub_driveOther_apply {A : Matrix (Fin n) (Fin n) ℝ}
       ring
     · rw [ite_eq_right h, ite_eq_right h, ite_eq_right h]
       ring
-  · rw [ite_eq_right hr]
-    refine Finset.sum_eq_zero fun q _ => ?_
-    rw [S.driveAfter_apply, S.driveOther_apply, ite_eq_right hr, ite_eq_right hr]
-    ring
+  · rw [ite_eq_right hr, (S.opE_drive_apply_of_ne A x hr).1,
+      (S.opE_drive_apply_of_ne A x hr).2, sub_zero]
 
 /-! ### The identity -/
 
@@ -338,11 +341,9 @@ theorem inner_sym_signedCoupling_mul_diag {A : Matrix (Fin n) (Fin n) ℝ}
     {x y : EuclideanSpace ℝ (Fin n)} (hx : ∀ p, S.sub p ≠ s → x p = 0)
     (hy : ∀ q, S.sub q ≠ s → y q = 0) :
     ⟪x, opE (sym (S.signedCoupling A * A)) y⟫ = -⟪opE A x, opE (S.osgn s) (opE A y)⟫ := by
-  have e : ⟪opE A y, opE (S.osgn s) (opE A x)⟫ = ⟪opE A x, opE (S.osgn s) (opE A y)⟫ := by
-    rw [S.inner_osgn, S.inner_osgn]
-    exact Finset.sum_congr rfl fun r _ => by ring
   rw [inner_opE_sym_eq, S.inner_signedCoupling_row A hx y, S.inner_signedCoupling_row A hy x,
-    S.inner_osgn_skew hskew hx y, S.inner_osgn_skew hskew hy x, e]
+    S.inner_osgn_skew hskew hx y, S.inner_osgn_skew hskew hy x,
+    S.inner_osgn_comm s (opE A x) (opE A y)]
   ring
 
 /-- **The diagonal block of the leading numerical dissipation:** for `x`, `y` supported on `s`,
@@ -480,12 +481,8 @@ theorem Consistent.numDissipation_diag {A U : Matrix (Fin n) (Fin n) ℝ} {H a b
       (diffLeadC b c ‖opE A‖ + (reactionC a b c ‖opE A‖ H +
         ‖opE (S.blk s A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blk s A)‖))) * H ^ 2 *
           (‖x‖ * ‖y‖) := by
-  have e : ⟪opE A y, opE (S.osgn s) (opE A x)⟫ = ⟪opE A x, opE (S.osgn s) (opE A y)⟫ := by
-    rw [S.inner_osgn, S.inner_osgn]
-    exact Finset.sum_congr rfl fun r _ => by ring
   have h1 := abs_le.1 (abs_inner_difference_sub_le hH h.hU h.hb h.hc hbH hAH x y)
-  have h2 := abs_le.1 (abs_inner_difference_sub_le hH h.hU h.hb h.hc hbH hAH y x)
-  rw [mul_comm ‖y‖ ‖x‖] at h2
+  have h2 := abs_le.1 (abs_inner_difference_sub_le_swap hH h.hU h.hb h.hc hbH hAH x y)
   have key : ∀ {u v : EuclideanSpace ℝ (Fin n)}, (∀ p, S.sub p ≠ s → u p = 0) →
       (∀ q, S.sub q ≠ s → v q = 0) →
       |H⁻¹ * ⟪u, opE (S.X - U) v⟫ + H / 2 * ⟪opE A u, opE (S.osgn s) (opE A v)⟫| ≤
@@ -493,17 +490,15 @@ theorem Consistent.numDissipation_diag {A U : Matrix (Fin n) (Fin n) ℝ} {H a b
           ‖opE (S.blk s A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blk s A)‖)) * H ^ 2 *
             (‖u‖ * ‖v‖) := by
     intro u v hu hv
-    have h3 : |H⁻¹ * (⟪u, opE (S.X - U) v⟫ +
-        H ^ 2 / 2 * ⟪opE A u, opE (S.osgn s) (opE A v)⟫)| ≤
-        (reactionC a b c ‖opE A‖ H +
-          ‖opE (S.blk s A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blk s A)‖)) * H ^ 2 *
-            (‖u‖ * ‖v‖) := by
-      rw [abs_mul, abs_of_pos (inv_pos.2 hH), inv_mul_le_iff₀ hH]
-      exact (h.reaction_partner_weights hskew hnp hFs hu hv).trans_eq (by ring)
-    rwa [mul_add, ← mul_assoc, inv_mul_sq_half hH.ne'] at h3
+    have h3 := abs_inv_mul_sub_half_le hH (q := -⟪opE A u, opE (S.osgn s) (opE A v)⟫)
+      (C := (reactionC a b c ‖opE A‖ H +
+        ‖opE (S.blk s A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blk s A)‖)) * H ^ 2 * (‖u‖ * ‖v‖))
+      (by rw [mul_neg, sub_neg_eq_add]
+          exact (h.reaction_partner_weights hskew hnp hFs hu hv).trans_eq (by ring))
+    rwa [mul_neg, sub_neg_eq_add] at h3
   have h3 := abs_le.1 (key hx hy)
   have h4 := abs_le.1 (key hy hx)
-  rw [mul_comm ‖y‖ ‖x‖, e] at h4
+  rw [mul_comm ‖y‖ ‖x‖, S.inner_osgn_comm s (opE A x) (opE A y)] at h4
   rw [inner_numDissipation, abs_le]
   change -((diffLeadC b c ‖opE A‖ + (reactionC a b c ‖opE A‖ H +
         ‖opE (S.blk s A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blk s A)‖))) * H ^ 2 *

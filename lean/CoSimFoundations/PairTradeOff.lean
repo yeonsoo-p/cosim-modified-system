@@ -60,12 +60,16 @@ theorem abs_inner_apply_le_half_spread (T : E →L[ℝ] E) {e₁ e₂ : E} (h1 :
   rw [abs_le]
   constructor <;> linarith
 
-/-- **The pair trade-off without a zero.** -/
-theorem pair_tradeoff (D U : E →L[ℝ] E) {e₁ e₂ : E} (h1 : ‖e₁‖ = 1) (h2 : ‖e₂‖ = 1)
-    (h12 : ⟪e₁, e₂⟫ = 0) {m : ℝ} (hm0 : 0 ≤ m) (hmD : ∀ x, m * ‖x‖ ≤ ‖D x‖) :
+/-- **The pair trade-off with two-sided bounds on the squared stretches.** If
+`lo ‖x‖² ≤ ‖D x‖² ≤ hi ‖x‖²` for every `x`, then `|u_X| - α (η + α/2) ≤ (hi - lo)/2`, with
+`u_X = ⟪e₁, (U - X) e₂⟫ + ⟪e₂, (U - X) e₁⟫`, `X = D ∘ U`. (`pair_tradeoff` is the case
+`lo = m²`, `hi = ‖D‖²`.) -/
+theorem pair_tradeoff_sq (D U : E →L[ℝ] E) {e₁ e₂ : E} (h1 : ‖e₁‖ = 1) (h2 : ‖e₂‖ = 1)
+    (h12 : ⟪e₁, e₂⟫ = 0) {lo hi : ℝ} (hlo : ∀ x, lo * ‖x‖ ^ 2 ≤ ‖D x‖ ^ 2)
+    (hhi : ∀ x, ‖D x‖ ^ 2 ≤ hi * ‖x‖ ^ 2) :
     |⟪e₁, U e₂ - D (U e₂)⟫ + ⟪e₂, U e₁ - D (U e₁)⟫| -
         ‖D - 1‖ * ((‖U e₁ - e₁‖ + ‖U e₂ - e₂‖) + ‖D - 1‖ / 2) ≤
-      (‖D‖ ^ 2 - m ^ 2) / 2 := by
+      (hi - lo) / 2 := by
   have key : ⟪e₁, U e₂ - D (U e₂)⟫ + ⟪e₂, U e₁ - D (U e₁)⟫ =
       ⟪(D - 1) e₁, (D - 1) e₂⟫ - ⟪D e₁, D e₂⟫ - ⟪e₁, (D - 1) (U e₂ - e₂)⟫ -
         ⟪e₂, (D - 1) (U e₁ - e₁)⟫ := by
@@ -73,20 +77,23 @@ theorem pair_tradeoff (D U : E →L[ℝ] E) {e₁ e₂ : E} (h1 : ‖e₁‖ = 1
     have c2 : ⟪e₂, e₁⟫ = 0 := by rw [real_inner_comm]; exact h12
     simp only [sub_apply, one_apply_eq_self, map_sub, inner_sub_left, inner_sub_right]
     linarith
-  have hlo : ∀ x, m ^ 2 * ‖x‖ ^ 2 ≤ ‖D x‖ ^ 2 := fun x => by
-    rw [← mul_pow]; exact pow_le_pow_left₀ (by positivity) (hmD x) 2
-  have hhi : ∀ x, ‖D x‖ ^ 2 ≤ ‖D‖ ^ 2 * ‖x‖ ^ 2 := fun x => by
-    rw [← mul_pow]; exact pow_le_pow_left₀ (norm_nonneg _) (D.le_opNorm x) 2
   have hlo' : ∀ x, 0 * ‖x‖ ^ 2 ≤ ‖(D - 1) x‖ ^ 2 := fun x => by
     rw [zero_mul]; positivity
-  have hhi' : ∀ x, ‖(D - 1) x‖ ^ 2 ≤ ‖D - 1‖ ^ 2 * ‖x‖ ^ 2 := fun x => by
-    rw [← mul_pow]; exact pow_le_pow_left₀ (norm_nonneg _) ((D - 1).le_opNorm x) 2
   have hD := abs_le.1 (abs_inner_apply_le_half_spread D h1 h2 h12 hlo hhi)
-  have hN := abs_le.1 (abs_inner_apply_le_half_spread (D - 1) h1 h2 h12 hlo' hhi')
+  have hN := abs_le.1
+    (abs_inner_apply_le_half_spread (D - 1) h1 h2 h12 hlo' (norm_apply_sq_le (D - 1)))
   have r1 := abs_le.1 (abs_inner_sub_one_apply_le D h1 (U e₂ - e₂))
   have r2 := abs_le.1 (abs_inner_sub_one_apply_le D h2 (U e₁ - e₁))
   rw [key, sub_le_iff_le_add, abs_le]
   constructor <;> linarith [hD.1, hD.2, hN.1, hN.2, r1.1, r1.2, r2.1, r2.2]
+
+/-- **The pair trade-off without a zero.** -/
+theorem pair_tradeoff (D U : E →L[ℝ] E) {e₁ e₂ : E} (h1 : ‖e₁‖ = 1) (h2 : ‖e₂‖ = 1)
+    (h12 : ⟪e₁, e₂⟫ = 0) {m : ℝ} (hm0 : 0 ≤ m) (hmD : ∀ x, m * ‖x‖ ≤ ‖D x‖) :
+    |⟪e₁, U e₂ - D (U e₂)⟫ + ⟪e₂, U e₁ - D (U e₁)⟫| -
+        ‖D - 1‖ * ((‖U e₁ - e₁‖ + ‖U e₂ - e₂‖) + ‖D - 1‖ / 2) ≤
+      (‖D‖ ^ 2 - m ^ 2) / 2 :=
+  pair_tradeoff_sq D U h1 h2 h12 (sq_mul_norm_sq_le hm0 hmD) (norm_apply_sq_le D)
 
 /-- **A defect that keeps the energy of every state** has a one-step error of first order wherever
 the scheme fails to move something between two directions. -/

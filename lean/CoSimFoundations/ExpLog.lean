@@ -52,16 +52,32 @@ theorem log_one_add_smul (t : ℝ) (y : 𝔸) :
 theorem logCoeff_mul_cast {n : ℕ} (hn : n ≠ 0) : logCoeff n * n = (-1) ^ (n + 1) := by
   rw [logCoeff, div_mul_cancel₀]; exact_mod_cast hn
 
+/-- The radius `R = 2 / (1 + ‖y‖)` is larger than `1` for `‖y‖ < 1`. -/
+theorem one_lt_two_div_one_add_norm {y : 𝔸} (hy : ‖y‖ < 1) : 1 < 2 / (1 + ‖y‖) := by
+  have hny : 0 ≤ ‖y‖ := norm_nonneg y
+  rw [lt_div_iff₀ (by linarith)]; linarith
+
+/-- `R ‖y‖ < 1` for the radius `R = 2 / (1 + ‖y‖)` and `‖y‖ < 1`. -/
+theorem two_div_one_add_norm_mul_norm_lt_one {y : 𝔸} (hy : ‖y‖ < 1) :
+    2 / (1 + ‖y‖) * ‖y‖ < 1 := by
+  have hny : 0 ≤ ‖y‖ := norm_nonneg y
+  rw [div_mul_eq_mul_div, div_lt_one (by linarith)]; nlinarith
+
+/-- `‖-(t y)‖ < 1` for `‖y‖ < 1` and `|t| < R`, `R = 2 / (1 + ‖y‖)`. -/
+theorem norm_neg_smul_lt_one_of_mem_Ioo {y : 𝔸} (hy : ‖y‖ < 1) {t : ℝ}
+    (ht : t ∈ Set.Ioo (-(2 / (1 + ‖y‖))) (2 / (1 + ‖y‖))) : ‖-(t • y)‖ < 1 := by
+  rw [norm_neg, norm_smul, Real.norm_eq_abs]
+  exact (mul_le_mul_of_nonneg_right (abs_lt.2 (Set.mem_Ioo.1 ht)).le (norm_nonneg y)).trans_lt
+    (two_div_one_add_norm_mul_norm_lt_one hy)
+
 /-- Termwise derivative of `t ↦ log (1 + t y)` for `‖y‖ < 1`, on `|t| < R`, `R = 2 / (1 + ‖y‖)`. -/
 theorem hasDerivAt_log_one_add_smul {y : 𝔸} (hy : ‖y‖ < 1) {t : ℝ}
     (ht : t ∈ Set.Ioo (-(2 / (1 + ‖y‖))) (2 / (1 + ‖y‖))) :
     HasDerivAt (fun s => log (1 + s • y))
       (∑' n : ℕ, (logCoeff n * (n * t ^ (n - 1))) • y ^ n) t := by
-  set R := 2 / (1 + ‖y‖) with hR
-  have hny : 0 ≤ ‖y‖ := norm_nonneg y
-  have hR1 : 1 < R := by rw [hR, lt_div_iff₀ (by linarith)]; linarith
-  have hRy : R * ‖y‖ < 1 := by
-    rw [hR, div_mul_eq_mul_div, div_lt_one (by linarith)]; nlinarith
+  set R := 2 / (1 + ‖y‖)
+  have hR1 : 1 < R := one_lt_two_div_one_add_norm hy
+  have hRy : R * ‖y‖ < 1 := two_div_one_add_norm_mul_norm_lt_one hy
   have hR0 : 0 ≤ R := by linarith
   let g : ℕ → ℝ → 𝔸 := fun n s => (logCoeff n * s ^ n) • y ^ n
   let g' : ℕ → ℝ → 𝔸 := fun n s => (logCoeff n * (n * s ^ (n - 1))) • y ^ n
@@ -105,15 +121,7 @@ theorem hasDerivAt_log_one_add_smul {y : 𝔸} (hy : ‖y‖ < 1) {t : ℝ}
 theorem deriv_series_eq {y : 𝔸} (hy : ‖y‖ < 1) {t : ℝ}
     (ht : t ∈ Set.Ioo (-(2 / (1 + ‖y‖))) (2 / (1 + ‖y‖))) :
     ∑' n : ℕ, (logCoeff n * (n * t ^ (n - 1))) • y ^ n = (∑' m : ℕ, (-(t • y)) ^ m) * y := by
-  set R := 2 / (1 + ‖y‖) with hR
-  have hny : 0 ≤ ‖y‖ := norm_nonneg y
-  have hRy : R * ‖y‖ < 1 := by
-    rw [hR, div_mul_eq_mul_div, div_lt_one (by linarith)]; nlinarith
-  have htR : |t| < R := abs_lt.2 ⟨(Set.mem_Ioo.1 ht).1, (Set.mem_Ioo.1 ht).2⟩
-  have hty : ‖-(t • y)‖ < 1 := by
-    rw [norm_neg, norm_smul, Real.norm_eq_abs]
-    calc |t| * ‖y‖ ≤ R * ‖y‖ := mul_le_mul_of_nonneg_right htR.le hny
-      _ < 1 := hRy
+  have hty : ‖-(t • y)‖ < 1 := norm_neg_smul_lt_one_of_mem_Ioo hy ht
   have hgeo : Summable fun m : ℕ => (-(t • y)) ^ m :=
     summable_geometric_of_norm_lt_one hty
   have hterm : ∀ m : ℕ, (logCoeff (m + 1) * ((m + 1 : ℕ) * t ^ (m + 1 - 1))) • y ^ (m + 1) =
@@ -137,9 +145,8 @@ theorem deriv_series_eq {y : 𝔸} (hy : ‖y‖ < 1) {t : ℝ}
 /-- **`exp (log (1 + y)) = 1 + y` for `‖y‖ < 1`.** -/
 theorem exp_log_one_add {y : 𝔸} (hy : ‖y‖ < 1) : exp (log (1 + y)) = 1 + y := by
   let _ : NormedAlgebra ℚ 𝔸 := NormedAlgebra.restrictScalars ℚ ℝ 𝔸
-  set R := 2 / (1 + ‖y‖) with hR
-  have hny : 0 ≤ ‖y‖ := norm_nonneg y
-  have hR1 : 1 < R := by rw [hR, lt_div_iff₀ (by linarith)]; linarith
+  set R := 2 / (1 + ‖y‖)
+  have hR1 : 1 < R := one_lt_two_div_one_add_norm hy
   set L : ℝ → 𝔸 := fun s => log (1 + s • y) with hL
   set D : ℝ → 𝔸 := fun s => (∑' m : ℕ, (-(s • y)) ^ m) * y with hD
   have hcomm : ∀ s t : ℝ, Commute (L s) (L t) := by
@@ -159,13 +166,7 @@ theorem exp_log_one_add {y : 𝔸} (hy : ‖y‖ < 1) : exp (log (1 + y)) = 1 + 
     have h := hE.mul hlin
     convert h using 1
     -- 0 = exp(-L t) (-D t) (1 + t y) + exp(-L t) y
-    have hty : ‖-(t • y)‖ < 1 := by
-      have htR : |t| < R := abs_lt.2 ⟨(Set.mem_Ioo.1 ht).1, (Set.mem_Ioo.1 ht).2⟩
-      have hRy : R * ‖y‖ < 1 := by
-        rw [hR, div_mul_eq_mul_div, div_lt_one (by linarith)]; nlinarith
-      rw [norm_neg, norm_smul, Real.norm_eq_abs]
-      calc |t| * ‖y‖ ≤ R * ‖y‖ := mul_le_mul_of_nonneg_right htR.le hny
-        _ < 1 := hRy
+    have hty : ‖-(t • y)‖ < 1 := norm_neg_smul_lt_one_of_mem_Ioo hy ht
     have hgeo := geom_series_mul_neg (-(t • y)) hty
     have hkey : D t * (1 + t • y) = y := by
       simp only [hD]

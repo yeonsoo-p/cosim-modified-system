@@ -13,7 +13,8 @@ map `X = F + M + N X`. The signed coupling is `A_ς` (`signedCoupling`).
 that is `((1 + F)/2 - (N - M)/2) (X - 1) = (F - 1 + M + N) (X + 1)/2`.
 Proof: the difference of the two sides is `2 (X - (F + M + N X))`.
 
-**The coefficients of the zero-order hold by the stages** (`zohNew_eq`, `zohOld_eq`): with
+**The coefficients of the zero-order hold by the stages** (`zohNew_eq`, `zohOld_eq`; these and
+the statements on `couplingNew`, `couplingOld` named below are in `HalfStepZOH`): with
 `A_new` the coupling from the subsystems of an earlier stage (`couplingNew`) and `A_old` the rest
 of the coupling (`couplingOld`), `A_old + A_new = A_c`, `A_new - A_old = A_ς`
 (`couplingOld_add_couplingNew`, `couplingNew_sub_couplingOld`),
@@ -139,76 +140,50 @@ theorem held_midpoint :
       (1 / 2 : ℝ) • ((S.F - 1 + S.M + S.N) * (S.X + 1)) := by
   rw [← smul_sub, smul_mul_assoc, held_midpoint_ring S.hX]
 
-/-! ### The coupling by the stages -/
+/-! ### The coefficients of the zero-order hold with `φ = φ₁(H A₀)` -/
 
-/-- The coupling on the new samples, `A_new`: the entries of the coupling part from a subsystem
-of an earlier stage. -/
-noncomputable def couplingNew (A : Matrix (Fin n) (Fin n) ℝ) : Matrix (Fin n) (Fin n) ℝ :=
-  Matrix.of fun p q => if S.stage (S.sub q) < S.stage (S.sub p) then S.coupling A p q else 0
+/-- `e^{H A₀} = 1 + H φ A₀`, `φ = φ₁(H A₀)`. -/
+theorem exp_smul_blockDiag_eq (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
+    NormedSpace.exp (H • S.blockDiag A) =
+      1 + H • (phiOne (H • S.blockDiag A) * S.blockDiag A) := by
+  rw [exp_eq_one_add_phiOne_mul, mul_smul_comm]
 
-/-- The coupling on the old samples, `A_old`: the entries of the coupling part from a subsystem
-that does not run at an earlier stage. -/
-noncomputable def couplingOld (A : Matrix (Fin n) (Fin n) ℝ) : Matrix (Fin n) (Fin n) ℝ :=
-  Matrix.of fun p q => if S.stage (S.sub q) < S.stage (S.sub p) then 0 else S.coupling A p q
+/-- The coefficients of the new samples are `H φ A_new`, `φ = φ₁(H A₀)`. -/
+theorem zohNew_eq_smul (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
+    S.zohNew A H = H • (phiOne (H • S.blockDiag A) * S.couplingNew A) := by
+  rw [S.zohNew_eq, zohKernel, smul_mul_assoc]
 
-/-- The entries of the coupling on the new samples. -/
-theorem couplingNew_apply (A : Matrix (Fin n) (Fin n) ℝ) (p q : Fin n) :
-    S.couplingNew A p q =
-      if S.stage (S.sub q) < S.stage (S.sub p) then S.coupling A p q else 0 := rfl
+/-- The coefficients of the old samples are `H φ A_old`, `φ = φ₁(H A₀)`. -/
+theorem zohOld_eq_smul (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
+    S.zohOld A H = H • (phiOne (H • S.blockDiag A) * S.couplingOld A) := by
+  rw [S.zohOld_eq, zohKernel, smul_mul_assoc]
 
-/-- The entries of the coupling on the old samples. -/
-theorem couplingOld_apply (A : Matrix (Fin n) (Fin n) ℝ) (p q : Fin n) :
-    S.couplingOld A p q =
-      if S.stage (S.sub q) < S.stage (S.sub p) then 0 else S.coupling A p q := rfl
+/-- **What the zero-order hold integrates, times the macro step:**
+`e^{H A₀} - 1 + zohOld + zohNew = H φ A`, `φ = φ₁(H A₀)`. -/
+theorem exp_sub_one_add_zohOld_add_zohNew (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
+    NormedSpace.exp (H • S.blockDiag A) - 1 + S.zohOld A H + S.zohNew A H =
+      H • (phiOne (H • S.blockDiag A) * A) := by
+  have hA : phiOne (H • S.blockDiag A) * A =
+      phiOne (H • S.blockDiag A) * S.blockDiag A +
+        (phiOne (H • S.blockDiag A) * S.couplingOld A +
+          phiOne (H • S.blockDiag A) * S.couplingNew A) := by
+    rw [← mul_add, ← mul_add, S.couplingOld_add_couplingNew, S.blockDiag_add_coupling]
+  rw [S.exp_smul_blockDiag_eq, S.zohNew_eq_smul, S.zohOld_eq_smul, hA]
+  module
 
-/-- `A_old + A_new = A_c`. -/
-theorem couplingOld_add_couplingNew (A : Matrix (Fin n) (Fin n) ℝ) :
-    S.couplingOld A + S.couplingNew A = S.coupling A := by
-  ext p q
-  rw [Matrix.add_apply, S.couplingOld_apply, S.couplingNew_apply]
-  by_cases h : S.stage (S.sub q) < S.stage (S.sub p)
-  · rw [ite_eq_left h, ite_eq_left h, zero_add]
-  · rw [ite_eq_right h, ite_eq_right h, add_zero]
-
-/-- **The signed coupling is the coupling on the new samples minus that on the old ones:**
-`A_new - A_old = A_ς`. -/
-theorem couplingNew_sub_couplingOld (A : Matrix (Fin n) (Fin n) ℝ) :
-    S.couplingNew A - S.couplingOld A = S.signedCoupling A := by
-  ext p q
-  rw [Matrix.sub_apply, S.couplingOld_apply, S.couplingNew_apply, S.signedCoupling_apply,
-    S.coupling_apply]
-  by_cases hpq : S.sub p = S.sub q
-  · simp [hpq]
-  · by_cases h : S.stage (S.sub q) < S.stage (S.sub p)
-    · simp [hpq, h, sg]
-    · simp [hpq, h, sg]
-
-/-- A block-diagonal matrix commutes with the cut of the coupling along the stages: the entries
-of `K A_c` from an earlier stage are those of `K A_new`. -/
-theorem zohNew_eq (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
-    S.zohNew A H = S.zohKernel A H * S.couplingNew A := by
-  ext p q
-  have hterm : ∀ r, S.zohKernel A H p r * S.couplingNew A r q =
-      if S.stage (S.sub q) < S.stage (S.sub p) then S.zohKernel A H p r * S.coupling A r q
-      else 0 := by
-    intro r
-    by_cases hr : S.sub p = S.sub r
-    · rw [S.couplingNew_apply, ← hr]
-      by_cases h : S.stage (S.sub q) < S.stage (S.sub p)
-      · rw [ite_eq_left h, ite_eq_left h]
-      · rw [ite_eq_right h, ite_eq_right h, mul_zero]
-    · rw [S.zohKernel_apply_eq_zero A H hr, zero_mul, zero_mul, ite_self]
-  rw [Matrix.mul_apply, Finset.sum_congr rfl fun r _ => hterm r]
-  by_cases h : S.stage (S.sub q) < S.stage (S.sub p)
-  · simp [zohNew, zohCoupling, Matrix.mul_apply, h]
-  · simp [zohNew, h]
-
-/-- The entries of `K A_c` that are not from an earlier stage are those of `K A_old`. -/
-theorem zohOld_eq (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
-    S.zohOld A H = S.zohKernel A H * S.couplingOld A := by
-  have h := S.zohOld_add_zohNew A H
-  rw [S.zohNew_eq, zohCoupling, ← S.couplingOld_add_couplingNew, mul_add] at h
-  exact add_right_cancel h
+/-- **The matrix on the left of the midpoint form of the zero-order hold:**
+`½ (1 + e^{H A₀}) - ½ (zohNew - zohOld) = 1 + (H/2) φ A₀ - (H/2) φ A_ς`, `φ = φ₁(H A₀)`. -/
+theorem half_one_add_exp_sub_half_zoh (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
+    (1 / 2 : ℝ) • (1 + NormedSpace.exp (H • S.blockDiag A)) -
+        (1 / 2 : ℝ) • (S.zohNew A H - S.zohOld A H) =
+      1 + (H / 2) • (phiOne (H • S.blockDiag A) * S.blockDiag A) -
+        (H / 2) • (phiOne (H • S.blockDiag A) * S.signedCoupling A) := by
+  have hς : phiOne (H • S.blockDiag A) * S.signedCoupling A =
+      phiOne (H • S.blockDiag A) * S.couplingNew A -
+        phiOne (H • S.blockDiag A) * S.couplingOld A := by
+    rw [← mul_sub, S.couplingNew_sub_couplingOld]
+  rw [S.exp_smul_blockDiag_eq, S.zohNew_eq_smul, S.zohOld_eq_smul, hς]
+  module
 
 /-! ### The midpoint form -/
 
@@ -222,30 +197,14 @@ theorem zoh_midpoint_of_eq (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ)
     (1 + (H / 2) • (phiOne (H • S.blockDiag A) * S.blockDiag A) -
         (H / 2) • (phiOne (H • S.blockDiag A) * S.signedCoupling A)) * (X - 1) =
       (H / 2) • (phiOne (H • S.blockDiag A) * A * (X + 1)) := by
-  have hF : NormedSpace.exp (H • S.blockDiag A) =
-      1 + H • (phiOne (H • S.blockDiag A) * S.blockDiag A) := by
-    rw [exp_eq_one_add_phiOne_mul, mul_smul_comm]
-  have hN : S.zohNew A H = H • (phiOne (H • S.blockDiag A) * S.couplingNew A) := by
-    rw [S.zohNew_eq, zohKernel, smul_mul_assoc]
-  have hM : S.zohOld A H = H • (phiOne (H • S.blockDiag A) * S.couplingOld A) := by
-    rw [S.zohOld_eq, zohKernel, smul_mul_assoc]
-  have hA : phiOne (H • S.blockDiag A) * A =
-      phiOne (H • S.blockDiag A) * S.blockDiag A +
-        (phiOne (H • S.blockDiag A) * S.couplingOld A +
-          phiOne (H • S.blockDiag A) * S.couplingNew A) := by
-    rw [← mul_add, ← mul_add, S.couplingOld_add_couplingNew, S.blockDiag_add_coupling]
-  have hς : phiOne (H • S.blockDiag A) * S.signedCoupling A =
-      phiOne (H • S.blockDiag A) * S.couplingNew A -
-        phiOne (H • S.blockDiag A) * S.couplingOld A := by
-    rw [← mul_sub, S.couplingNew_sub_couplingOld]
   have e1 : 1 + NormedSpace.exp (H • S.blockDiag A) - (S.zohNew A H - S.zohOld A H) =
       (2 : ℝ) • (1 + (H / 2) • (phiOne (H • S.blockDiag A) * S.blockDiag A) -
         (H / 2) • (phiOne (H • S.blockDiag A) * S.signedCoupling A)) := by
-    rw [hF, hN, hM, hς]
+    rw [← S.half_one_add_exp_sub_half_zoh A H]
     module
   have e2 : NormedSpace.exp (H • S.blockDiag A) - 1 + S.zohOld A H + S.zohNew A H =
       (2 : ℝ) • ((H / 2) • (phiOne (H • S.blockDiag A) * A)) := by
-    rw [hF, hN, hM, hA]
+    rw [S.exp_sub_one_add_zohOld_add_zohNew A H]
     module
   have h := held_midpoint_ring hX
   rw [e1, e2, smul_mul_assoc, smul_mul_assoc] at h

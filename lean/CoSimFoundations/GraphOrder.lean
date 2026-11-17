@@ -51,21 +51,13 @@ variable {n : ℕ} {κ : Type*} {S : HeldScheme n κ}
 
 /-! ### (i) Jacobi mode -/
 
-/-- In Jacobi mode all signs are `-1`. -/
-theorem sg_of_jacobi (hJ : ∀ s t, S.stage s = S.stage t) (s k : κ) : S.sg s k = -1 := by
-  have h : ¬ S.stage k < S.stage s := by rw [hJ k s]; exact lt_irrefl _
-  simp [sg, h]
-
 /-- **Jacobi mode: the sum of Corollary 5.6 (i).** All signs are `-1`, so the sum that decides
 whether a pair is forced into dissipation is `-2 (A²) p q`: the pair is forced iff
 `(A²) p q ≠ 0`. -/
 theorem jacobi_sum (hJ : ∀ s t, S.stage s = S.stage t) (A : Matrix (Fin n) (Fin n) ℝ)
     (s t : κ) (p q : Fin n) :
     ∑ r, (S.sg s (S.sub r) + S.sg t (S.sub r)) * A p r * A r q = -2 * (A * A) p q := by
-  rw [Matrix.mul_apply, Finset.mul_sum]
-  refine Finset.sum_congr rfl fun r _ => ?_
-  rw [sg_of_jacobi hJ, sg_of_jacobi hJ]
-  ring
+  rw [← S.sgn_add_entry, mul_sgn_add_mul_of_jacobi hJ, Matrix.smul_apply, smul_eq_mul]
 
 /-- A Jacobi scheme uses no new samples. -/
 theorem N_eq_zero_of_jacobi (hJ : ∀ s t, S.stage s = S.stage t) : S.N = 0 := by
@@ -95,9 +87,7 @@ theorem jacobi_block (hJ : ∀ s t, S.stage s = S.stage t) {A U : Matrix (Fin n)
   have key : ∀ p q, S.sub p = s → S.sub q = t →
       (S.X - U + (H ^ 2 / 2) • (A * A)) p q = (-R) p q := by
     intro p q hp hq
-    have hne : S.sub p ≠ S.sub q := by rw [hp, hq]; exact hst
-    have hnp' : ¬ S.partner (S.sub p) (S.sub q) := by rw [hp, hq]; exact hnp
-    have hpq : p ≠ q := fun h => hne (h ▸ rfl)
+    obtain ⟨hne, hnp', hpq⟩ := S.sub_ne_of_eq hst hnp hp hq
     simp only [hR, Matrix.sub_apply, Matrix.add_apply, Matrix.smul_apply, Matrix.neg_apply,
       Matrix.one_apply_ne hpq, smul_eq_mul, hA p q hne hnp', X_eq_zero_of_jacobi hJ hne hnp']
     ring
@@ -159,8 +149,7 @@ theorem jacobi_pair_gain (hJ : ∀ s t, S.stage s = S.stage t) {A U D : Matrix (
       (‖opE D‖ - 1) + ‖opE D - 1‖ * (1 + (‖opE U x - x‖ + ‖opE U y - y‖)) := by
   have h1 := jacobi_sym hJ hH hU hA hskew hst hnp hnp' hx hy
   rw [hx1, hy1, mul_one, mul_one] at h1
-  have h2 := pair_gain (opE D) (opE U) hx1 hy1 (inner_eq_zero_of_support hst hx hy)
-  rw [inner_defect_eq hD, inner_defect_eq hD, ← neg_add, abs_neg] at h2
+  have h2 := abs_inner_step_add_le_pair_gain hD hst hx hy hx1 hy1
   have h3 : H ^ 2 * |⟪x, opE (A * A) y⟫| = |H ^ 2 * ⟪x, opE (A * A) y⟫| := by
     rw [abs_mul, abs_of_nonneg (by positivity : (0 : ℝ) ≤ H ^ 2)]
   rw [h3]
@@ -187,10 +176,6 @@ theorem exists_pair_same_side (S : HeldScheme n κ) (k : κ) (f : Fin 3 → κ) 
   · have hj : ¬ S.stage k < S.stage (f j) := fun hj => hi (h'.2 hj)
     simp [sg, hi, hj]
 
-/-- The square of a sign is one. -/
-theorem abs_sg (S : HeldScheme n κ) (s k : κ) : |S.sg s k| = 1 := by
-  by_cases h : S.stage k < S.stage s <;> simp [sg, h]
-
 /-- **Corollary 5.6 (ii), the sum.** Let `p 0`, `p 1`, `p 2` be three states and `k` a state such
 that, for each two of the three, `k` is the only state through which they interact
 (`A (p i) r * A r (p j) = 0` for `r ≠ k`). Then in every order of execution there is a pair for
@@ -202,8 +187,7 @@ theorem exists_pair_sum (S : HeldScheme n κ) (A : Matrix (Fin n) (Fin n) ℝ) (
       A (p i) r * A r (p j)| = 2 * |A (p i) k * A k (p j)| := by
   obtain ⟨i, j, hij, h⟩ := S.exists_pair_same_side (S.sub k) (fun i => S.sub (p i))
   refine ⟨i, j, hij, ?_⟩
-  rw [Finset.sum_eq_single k (fun r _ hr => by rw [mul_assoc, honly i j hij r hr, mul_zero])
-    (fun hk => absurd (Finset.mem_univ k) hk), h, mul_assoc, abs_mul, ← two_mul, abs_mul,
+  rw [sum_mul_mul_eq_single (honly i j hij), h, mul_assoc, abs_mul, ← two_mul, abs_mul,
     S.abs_sg, mul_one, abs_two]
 
 section Consistent
@@ -224,10 +208,8 @@ theorem Consistent.exists_pair_forced (h : S.Consistent A U H a b c)
   obtain ⟨i, j, hij, hs⟩ := S.exists_pair_sum A p k honly
   refine ⟨i, j, hij, ?_⟩
   have h1 := h.forced_sym_entry hskew (hne i j hij) (hnp i j hij) (hnp j i hij.symm)
-  have h2 := abs_sub_abs_le_abs_sub
-    (H ^ 2 / 2 * ∑ r, (S.sg (S.sub (p i)) (S.sub r) + S.sg (S.sub (p j)) (S.sub r)) *
-      A (p i) r * A r (p j)) ((S.X - U) (p i) (p j) + (S.X - U) (p j) (p i))
-  rw [abs_sub_comm, abs_mul, abs_of_nonneg (by positivity : (0 : ℝ) ≤ H ^ 2 / 2), hs] at h2
+  have h2 := mul_abs_sub_le_abs (by positivity) h1
+  rw [hs] at h2
   linarith
 
 /-- **Corollary 5.6 (ii) with the cost.** In the situation of `exists_pair_forced`, with
@@ -267,14 +249,7 @@ theorem sum_eq_zero_of_between {A : Matrix (Fin n) (Fin n) ℝ}
     · rw [hA p r (fun h => hrp h.symm) (by rw [hrq]; exact hnp), mul_zero, zero_mul]
     · by_cases h1 : S.partner (S.sub p) (S.sub r)
       · by_cases h2 : S.partner (S.sub r) (S.sub q)
-        · have hk := hbetween (S.sub r) h1 h2
-          have h0 : S.sg (S.sub p) (S.sub r) + S.sg (S.sub q) (S.sub r) = 0 := by
-            by_cases hkq : S.stage (S.sub r) < S.stage (S.sub q)
-            · have hkp : ¬ S.stage (S.sub r) < S.stage (S.sub p) := fun h' => (hk.1 h') hkq
-              simp [sg, hkp, hkq]
-            · have hkp : S.stage (S.sub r) < S.stage (S.sub p) := hk.2 hkq
-              simp [sg, hkp, hkq]
-          rw [h0, zero_mul, zero_mul]
+        · rw [S.sg_add_sg_eq_zero (hbetween (S.sub r) h1 h2), zero_mul, zero_mul]
         · rw [hA r q hrq h2, mul_zero]
       · rw [hA p r (fun h => hrp h.symm) h1, mul_zero, zero_mul]
 

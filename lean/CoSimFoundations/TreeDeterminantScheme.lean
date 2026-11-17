@@ -16,11 +16,13 @@ from partners at an earlier stage, `M` from partners that do not run at an earli
 * `det_sq_sub_X_of_isAcyclic`: the same if the partners are linked in an acyclic graph on
   finitely many subsystems and no two partners share a stage (the potential exists,
   `exists_stagePotential`).
-* `det_sq_sub_zoh_X`: for the zero-order hold `S.zoh A hA H`,
+* `det_sq_sub_zoh_X_of_offset`, `det_sq_sub_zoh_X`: for the zero-order hold `S.zoh A hA H`
+  with a stage offset (`IsStageOffset`: the potential as a predicate), in particular on a tree,
   `det(s² - X) = det(s² - e^{H A₀} - s (∫₀ᴴ e^{τ A₀} dτ) A_c)`; the right side does not contain
   the stages.
-* `charpoly_zoh_restage_eq`: the zero-order holds in any two assignments of stages without two
-  partners at the same stage have the same characteristic polynomial, hence the same
+* `charpoly_zoh_restage_eq_of_offset`, `charpoly_zoh_restage_eq`: the zero-order holds in any
+  two assignments of stages that both have a stage offset, in particular on a tree without two
+  partners at the same stage, have the same characteristic polynomial, hence the same
   eigenvalues with the same multiplicities.
 -/
 import CoSimFoundations.TreeDeterminant
@@ -44,10 +46,7 @@ theorem det_sq_sub_X_of_potential (p : κ → ℤ)
     (s ^ 2 • (1 : Matrix (Fin n) (Fin n) 𝕜) - S.X.map (algebraMap ℝ 𝕜)).det =
       (s ^ 2 • (1 : Matrix (Fin n) (Fin n) 𝕜) - S.F.map (algebraMap ℝ 𝕜) -
         s • (S.N + S.M).map (algebraMap ℝ 𝕜)).det := by
-  have hX0 : (1 - S.N) * S.X = S.F + S.M := by
-    rw [sub_mul, one_mul, sub_eq_iff_eq_add]
-    exact S.hX
-  have hX := congrArg (algebraMap ℝ 𝕜).mapMatrix hX0
+  have hX := congrArg (algebraMap ℝ 𝕜).mapMatrix S.one_sub_N_mul_X
   simp only [map_mul, map_sub, map_add, map_one, RingHom.mapMatrix_apply] at hX
   have hsum : S.N.map (algebraMap ℝ 𝕜) + S.M.map (algebraMap ℝ 𝕜) =
       (S.N + S.M).map (algebraMap ℝ 𝕜) := by
@@ -73,6 +72,22 @@ theorem det_sq_sub_X_of_potential (p : κ → ℤ)
       rw [Matrix.map_apply, h0, map_zero]
   rw [det_sq_sub_eq_of_potential (fun i => p (S.sub i)) hF' hN' hM' hX s, hsum]
 
+/-- **A potential of the stages exists on a tree:** if the partners are linked in an acyclic
+graph on finitely many subsystems and no two partners share a stage, there are integers `p_s`
+such that `p` is larger by one at the partner that runs later. -/
+theorem exists_potential_of_isAcyclic [Fintype κ] {Gr : SimpleGraph κ} (hGr : Gr.IsAcyclic)
+    (hpart : ∀ s t, S.partner s t → Gr.Adj s t)
+    (hns : ∀ s t, s ≠ t → S.partner s t → S.stage s ≠ S.stage t) :
+    ∃ p : κ → ℤ, ∀ s t, S.partner s t → (S.stage t < S.stage s ∧ p s = p t + 1) ∨
+      (S.stage s < S.stage t ∧ p t = p s + 1) := by
+  obtain ⟨p, hp⟩ := exists_stagePotential hGr S.stage
+  refine ⟨p, fun a b hab => ?_⟩
+  have hadj := hpart a b hab
+  have hne := hns a b (Gr.ne_of_adj hadj) hab
+  rcases lt_or_gt_of_ne hne with h | h
+  · exact Or.inr ⟨h, hp b a hadj.symm h⟩
+  · exact Or.inl ⟨h, hp a b hadj h⟩
+
 /-- **The eigenvalue equation of a sequential scheme on a tree** (the paper, equation `eq:tree`).
 Let the partners be linked in an acyclic graph `Gr` on finitely many subsystems and let no two
 partners share a stage. Then over every field `𝕜 ⊇ ℝ` and for every `s : 𝕜`,
@@ -83,22 +98,44 @@ theorem det_sq_sub_X_of_isAcyclic [Fintype κ] {Gr : SimpleGraph κ} (hGr : Gr.I
     (s ^ 2 • (1 : Matrix (Fin n) (Fin n) 𝕜) - S.X.map (algebraMap ℝ 𝕜)).det =
       (s ^ 2 • (1 : Matrix (Fin n) (Fin n) 𝕜) - S.F.map (algebraMap ℝ 𝕜) -
         s • (S.N + S.M).map (algebraMap ℝ 𝕜)).det := by
-  obtain ⟨p, hp⟩ := exists_stagePotential hGr S.stage
-  refine S.det_sq_sub_X_of_potential p (fun a b hab => ?_) s
-  have hadj := hpart a b hab
-  have hne := hns a b (Gr.ne_of_adj hadj) hab
-  rcases lt_or_gt_of_ne hne with h | h
-  · exact Or.inr ⟨h, hp b a hadj.symm h⟩
-  · exact Or.inl ⟨h, hp a b hadj h⟩
+  obtain ⟨p, hp⟩ := S.exists_potential_of_isAcyclic hGr hpart hns
+  exact S.det_sq_sub_X_of_potential p hp s
 
-variable [DecidableEq κ]
+end HeldScheme
+
+/-! ### The zero-order hold: with a stage offset, and on a tree -/
+
+namespace HeldScheme
+
+/-- **A stage offset:** integers `p_s` such that every pair of partners runs at different stages
+and `p` is larger by one at the partner that runs later. -/
+def IsStageOffset {n : ℕ} {κ : Type*} (S : HeldScheme n κ) (p : κ → ℤ) : Prop :=
+  ∀ s t, S.partner s t → (S.stage t < S.stage s ∧ p s = p t + 1) ∨
+    (S.stage s < S.stage t ∧ p t = p s + 1)
+
+/-- **The eigenvalue equation of the zero-order hold, with a stage offset** (the paper, equation
+`eq:tree`): over every field `𝕜 ⊇ ℝ` and for every `s : 𝕜`,
+`det(s² - X) = det(s² - e^{H A₀} - s G° C)`, `G° C = (∫₀ᴴ e^{τ A₀} dτ) A_c`. -/
+theorem det_sq_sub_zoh_X_of_offset {n : ℕ} {κ : Type*} (S : HeldScheme n κ) [DecidableEq κ]
+    {𝕜 : Type*} [Field 𝕜] [Algebra ℝ 𝕜] {p : κ → ℤ}
+    (hp : S.IsStageOffset p) {A : Matrix (Fin n) (Fin n) ℝ}
+    (hA : ∀ p q, S.sub p ≠ S.sub q → ¬ S.partner (S.sub p) (S.sub q) → A p q = 0) (H : ℝ)
+    (s : 𝕜) :
+    (s ^ 2 • (1 : Matrix (Fin n) (Fin n) 𝕜) - (S.zoh A hA H).X.map (algebraMap ℝ 𝕜)).det =
+      (s ^ 2 • (1 : Matrix (Fin n) (Fin n) 𝕜) -
+        (NormedSpace.exp (H • S.blockDiag A)).map (algebraMap ℝ 𝕜) -
+        s • (S.zohCoupling A H).map (algebraMap ℝ 𝕜)).det := by
+  have h := (S.zoh A hA H).det_sq_sub_X_of_potential (𝕜 := 𝕜) p hp s
+  rw [add_comm, S.zoh_M_add_N] at h
+  exact h
 
 /-- **The eigenvalue equation of the zero-order hold on a tree** (the paper, equation `eq:tree`).
 Let the partners be linked in an acyclic graph on finitely many subsystems and let no two
 partners share a stage. The one-step map `X` of the zero-order hold obeys, over every field
 `𝕜 ⊇ ℝ` and for every `s : 𝕜`, `det(s² - X) = det(s² - e^{H A₀} - s G° C)`,
-`G° C = (∫₀ᴴ e^{τ A₀} dτ) A_c` (`zohCoupling`). -/
-theorem det_sq_sub_zoh_X [Fintype κ] {Gr : SimpleGraph κ} (hGr : Gr.IsAcyclic)
+`G° C = (∫₀ᴴ e^{τ A₀} dτ) A_c` (`zohCoupling`): on a tree a stage offset exists. -/
+theorem det_sq_sub_zoh_X {n : ℕ} {κ : Type*} (S : HeldScheme n κ) {𝕜 : Type*} [Field 𝕜]
+    [Algebra ℝ 𝕜] [DecidableEq κ] [Fintype κ] {Gr : SimpleGraph κ} (hGr : Gr.IsAcyclic)
     (hpart : ∀ s t, S.partner s t → Gr.Adj s t)
     (hns : ∀ s t, s ≠ t → S.partner s t → S.stage s ≠ S.stage t)
     {A : Matrix (Fin n) (Fin n) ℝ}
@@ -108,25 +145,38 @@ theorem det_sq_sub_zoh_X [Fintype κ] {Gr : SimpleGraph κ} (hGr : Gr.IsAcyclic)
       (s ^ 2 • (1 : Matrix (Fin n) (Fin n) 𝕜) -
         (NormedSpace.exp (H • S.blockDiag A)).map (algebraMap ℝ 𝕜) -
         s • (S.zohCoupling A H).map (algebraMap ℝ 𝕜)).det := by
-  have h := (S.zoh A hA H).det_sq_sub_X_of_isAcyclic (𝕜 := 𝕜) hGr hpart hns s
-  rw [add_comm, S.zoh_M_add_N] at h
-  exact h
+  obtain ⟨p, hp⟩ := S.exists_potential_of_isAcyclic hGr hpart hns
+  exact S.det_sq_sub_zoh_X_of_offset hp hA H s
+
+/-- **Two orders with stage offsets have the same eigenvalues** (the paper, Section "Energy stored
+and energy created"): if the stages of `S` and the stages `st` both have a stage offset, the
+one-step maps of the zero-order hold in the two assignments have the same characteristic
+polynomial, for every macro step `H`. -/
+theorem charpoly_zoh_restage_eq_of_offset {n : ℕ} {κ : Type*} (S : HeldScheme n κ)
+    [DecidableEq κ] {p p' : κ → ℤ} (hp : S.IsStageOffset p)
+    {st : κ → ℕ} (hp' : (S.restage st).IsStageOffset p') {A : Matrix (Fin n) (Fin n) ℝ}
+    (hA : ∀ p q, S.sub p ≠ S.sub q → ¬ S.partner (S.sub p) (S.sub q) → A p q = 0) (H : ℝ) :
+    ((S.restage st).zoh A hA H).X.charpoly = (S.zoh A hA H).X.charpoly :=
+  charpoly_eq_of_det_sq_sub_eq fun s => by
+    rw [(S.restage st).det_sq_sub_zoh_X_of_offset hp' hA H s,
+      S.det_sq_sub_zoh_X_of_offset hp hA H s]
+    rfl
 
 /-- **On a tree the order of execution of a sequential zero-order hold changes no eigenvalue**
 (the paper, Section "Energy stored and energy created"). Let the partners be linked in an acyclic
 graph on finitely many subsystems. For two assignments of stages, `S.stage` and `st`, in each of
 which no two partners share a stage, the one-step maps of the zero-order hold have the same
-characteristic polynomial, for every macro step `H`. -/
-theorem charpoly_zoh_restage_eq [Fintype κ] {Gr : SimpleGraph κ} (hGr : Gr.IsAcyclic)
+characteristic polynomial, for every macro step `H`: both assignments have a stage offset. -/
+theorem charpoly_zoh_restage_eq {n : ℕ} {κ : Type*} (S : HeldScheme n κ) [DecidableEq κ]
+    [Fintype κ] {Gr : SimpleGraph κ} (hGr : Gr.IsAcyclic)
     (hpart : ∀ s t, S.partner s t → Gr.Adj s t)
     (hns : ∀ s t, s ≠ t → S.partner s t → S.stage s ≠ S.stage t) {st : κ → ℕ}
     (hns' : ∀ s t, s ≠ t → S.partner s t → st s ≠ st t) {A : Matrix (Fin n) (Fin n) ℝ}
     (hA : ∀ p q, S.sub p ≠ S.sub q → ¬ S.partner (S.sub p) (S.sub q) → A p q = 0) (H : ℝ) :
-    ((S.restage st).zoh A hA H).X.charpoly = (S.zoh A hA H).X.charpoly :=
-  charpoly_eq_of_det_sq_sub_eq fun s => by
-    rw [(S.restage st).det_sq_sub_zoh_X hGr hpart hns' hA H s,
-      S.det_sq_sub_zoh_X hGr hpart hns hA H s]
-    rfl
+    ((S.restage st).zoh A hA H).X.charpoly = (S.zoh A hA H).X.charpoly := by
+  obtain ⟨p, hp⟩ := S.exists_potential_of_isAcyclic hGr hpart hns
+  obtain ⟨p', hp'⟩ := (S.restage st).exists_potential_of_isAcyclic hGr hpart hns'
+  exact S.charpoly_zoh_restage_eq_of_offset hp hp' hA H
 
 end HeldScheme
 

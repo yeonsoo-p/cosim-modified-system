@@ -15,7 +15,10 @@ Proposition `prop:lent`; part (iii) of that proposition is the case `A_i = 0` of
 (`N_eq_zohNew`, `M_eq_zohOld`).
 
 **The split of the coupling by the stages.** `newPart S A = A_new`: the entries of `A_c` whose
-column runs at an earlier stage than the row; `oldPart S A = A_old`: the others.
+column runs at an earlier stage than the row; `oldPart S A = A_old`: the others. These are the
+matrices `HeldScheme.couplingNew` and `HeldScheme.couplingOld` of `HalfStepZOH`
+(`newPart_eq_couplingNew`, `oldPart_eq_couplingOld`), and the statements about them are those
+about `couplingNew` and `couplingOld`.
 `A_old + A_new = A_c` and `A_new - A_old = A_ς = signedCoupling` (`oldPart_add_newPart`,
 `newPart_sub_oldPart`). Because `φ₁(H A₀)` has no entry between different subsystems,
 `zohNew = H φ₁(H A₀) A_new` and `zohOld = H φ₁(H A₀) A_old` (`zohNew_eq`, `zohOld_eq`), and with
@@ -78,26 +81,25 @@ theorem oldPart_apply (A : Matrix (Fin n) (Fin n) ℝ) (p q : Fin n) :
     oldPart S A p q = if S.stage (S.sub q) < S.stage (S.sub p) then 0 else S.coupling A p q :=
   rfl
 
+/-- `newPart` is the matrix `HeldScheme.couplingNew` of `HalfStepZOH`. -/
+theorem newPart_eq_couplingNew (A : Matrix (Fin n) (Fin n) ℝ) :
+    newPart S A = S.couplingNew A :=
+  rfl
+
+/-- `oldPart` is the matrix `HeldScheme.couplingOld` of `HalfStepZOH`. -/
+theorem oldPart_eq_couplingOld (A : Matrix (Fin n) (Fin n) ℝ) :
+    oldPart S A = S.couplingOld A :=
+  rfl
+
 /-- `A_old + A_new = A_c`. -/
 theorem oldPart_add_newPart (A : Matrix (Fin n) (Fin n) ℝ) :
     oldPart S A + newPart S A = S.coupling A := by
-  ext p q
-  rw [Matrix.add_apply, oldPart_apply, newPart_apply]
-  by_cases h : S.stage (S.sub q) < S.stage (S.sub p)
-  · rw [ite_eq_left h, ite_eq_left h, zero_add]
-  · rw [ite_eq_right h, ite_eq_right h, add_zero]
+  rw [oldPart_eq_couplingOld, newPart_eq_couplingNew, S.couplingOld_add_couplingNew]
 
 /-- `A_new - A_old = A_ς`, the signed coupling. -/
 theorem newPart_sub_oldPart (A : Matrix (Fin n) (Fin n) ℝ) :
     newPart S A - oldPart S A = S.signedCoupling A := by
-  ext p q
-  rw [Matrix.sub_apply, newPart_apply, oldPart_apply, S.signedCoupling_apply, S.coupling_apply]
-  by_cases hpq : S.sub p = S.sub q
-  · rw [ite_eq_left hpq, ite_self, sub_zero, ite_eq_left hpq]
-  · rw [ite_eq_right hpq, ite_eq_right hpq, HeldScheme.sg]
-    by_cases h : S.stage (S.sub q) < S.stage (S.sub p)
-    · rw [ite_eq_left h, ite_eq_left h, ite_eq_left h, sub_zero, one_mul]
-    · rw [ite_eq_right h, ite_eq_right h, ite_eq_right h, zero_sub, neg_one_mul]
+  rw [newPart_eq_couplingNew, oldPart_eq_couplingOld, S.couplingNew_sub_couplingOld]
 
 /-- `A₀ + A_old + A_new = A`. -/
 theorem blockDiag_add_oldPart_add_newPart (A : Matrix (Fin n) (Fin n) ℝ) :
@@ -109,44 +111,28 @@ theorem newPart_sub_oldPart_eq (A : Matrix (Fin n) (Fin n) ℝ) :
     newPart S A - oldPart S A = S.seqCoupling A - S.parCoupling A := by
   rw [newPart_sub_oldPart, S.signedCoupling_eq]
 
+/-- The kernel `H φ₁(H A₀)` has no entry between different subsystems: the entry `(p, q)` of a
+product `H φ₁(H A₀) B` depends only on the rows of `B` in the subsystem of `p`. -/
+theorem zohKernel_mul_apply_congr (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ)
+    {B B' : Matrix (Fin n) (Fin n) ℝ} {p q : Fin n}
+    (h : ∀ r, S.sub p = S.sub r → B r q = B' r q) :
+    (S.zohKernel A H * B) p q = (S.zohKernel A H * B') p q := by
+  rw [Matrix.mul_apply, Matrix.mul_apply]
+  refine Finset.sum_congr rfl fun r _ => ?_
+  by_cases hr : S.sub p = S.sub r
+  · rw [h r hr]
+  · rw [S.zohKernel_apply_eq_zero A H hr, zero_mul, zero_mul]
+
 /-- The coefficients of the new samples of the zero-order hold are `H φ₁(H A₀) A_new`: the kernel
 has no entry between different subsystems, so the cut along the stages commutes with it. -/
 theorem zohNew_eq (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
     S.zohNew A H = S.zohKernel A H * newPart S A := by
-  ext p q
-  rw [Matrix.mul_apply]
-  by_cases h : S.stage (S.sub q) < S.stage (S.sub p)
-  · have e : S.zohNew A H p q = S.zohCoupling A H p q := by simp [HeldScheme.zohNew, h]
-    rw [e, HeldScheme.zohCoupling, Matrix.mul_apply]
-    refine Finset.sum_congr rfl fun r _ => ?_
-    by_cases hr : S.sub p = S.sub r
-    · rw [newPart_apply, ← hr, ite_eq_left h]
-    · rw [S.zohKernel_apply_eq_zero A H hr, zero_mul, zero_mul]
-  · have e : S.zohNew A H p q = 0 := by simp [HeldScheme.zohNew, h]
-    rw [e]
-    refine (Finset.sum_eq_zero fun r _ => ?_).symm
-    by_cases hr : S.sub p = S.sub r
-    · rw [newPart_apply, ← hr, ite_eq_right h, mul_zero]
-    · rw [S.zohKernel_apply_eq_zero A H hr, zero_mul]
+  rw [newPart_eq_couplingNew, S.zohNew_eq]
 
 /-- The coefficients of the old samples of the zero-order hold are `H φ₁(H A₀) A_old`. -/
 theorem zohOld_eq (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ) :
     S.zohOld A H = S.zohKernel A H * oldPart S A := by
-  ext p q
-  rw [Matrix.mul_apply]
-  by_cases h : S.stage (S.sub q) < S.stage (S.sub p)
-  · have e : S.zohOld A H p q = 0 := by simp [HeldScheme.zohOld, h]
-    rw [e]
-    refine (Finset.sum_eq_zero fun r _ => ?_).symm
-    by_cases hr : S.sub p = S.sub r
-    · rw [oldPart_apply, ← hr, ite_eq_left h, mul_zero]
-    · rw [S.zohKernel_apply_eq_zero A H hr, zero_mul]
-  · have e : S.zohOld A H p q = S.zohCoupling A H p q := by simp [HeldScheme.zohOld, h]
-    rw [e, HeldScheme.zohCoupling, Matrix.mul_apply]
-    refine Finset.sum_congr rfl fun r _ => ?_
-    by_cases hr : S.sub p = S.sub r
-    · rw [oldPart_apply, ← hr, ite_eq_right h]
-    · rw [S.zohKernel_apply_eq_zero A H hr, zero_mul, zero_mul]
+  rw [oldPart_eq_couplingOld, S.zohOld_eq]
 
 variable {A : Matrix (Fin n) (Fin n) ℝ} {H : ℝ}
 
@@ -208,14 +194,7 @@ theorem zohQ_eq : zohQ S A H =
 and of the paper's Proposition `prop:lent` (iii): `Q = 1 - (H/2) A_seq`. -/
 theorem zohQ_of_blockDiag_eq_zero (hA0 : S.blockDiag A = 0) :
     zohQ S A H = 1 - (H / 2) • S.seqCoupling A := by
-  have h1 : phiOne (0 : Matrix (Fin n) (Fin n) ℝ) = 1 := by
-    have h2 := (hasSum_phiOne (0 : Matrix (Fin n) (Fin n) ℝ)).unique
-      (hasSum_single (f := fun j : ℕ => (((j + 1).factorial : ℕ) : ℝ)⁻¹ •
-        (0 : Matrix (Fin n) (Fin n) ℝ) ^ j) 0 fun j hj => by
-          rw [zero_pow hj, smul_zero])
-    rw [h2]
-    simp
-  rw [zohQ_eq, hA0, smul_zero, h1, inv_one, smul_zero, add_zero]
+  rw [zohQ_eq, hA0, smul_zero, HeldScheme.phiOne_zero_eq_one, inv_one, smul_zero, add_zero]
 
 /-- **(a) `Ψ` is symmetric for lossless subsystems:** if `A₀ᵀ = -A₀` and `φ₁(H A₀)` is
 invertible, then `Ψᵀ = Ψ`. -/
@@ -244,13 +223,8 @@ theorem coupling_skew_of_skew (hA : Aᵀ = -A) :
 parallel part. -/
 theorem parCoupling_eq_zero_of_partner
     (hA : ∀ p q, S.sub p ≠ S.sub q → ¬ S.partner (S.sub p) (S.sub q) → A p q = 0)
-    (hstage : ∀ s t, S.partner s t → S.stage s ≠ S.stage t) : S.parCoupling A = 0 := by
-  ext p q
-  rw [S.parCoupling_apply, Matrix.zero_apply]
-  by_cases h : S.sub p ≠ S.sub q ∧ S.stage (S.sub p) = S.stage (S.sub q)
-  · rw [ite_eq_left h]
-    exact hA p q h.1 fun hp => hstage _ _ hp h.2
-  · rw [ite_eq_right h]
+    (hstage : ∀ s t, S.partner s t → S.stage s ≠ S.stage t) : S.parCoupling A = 0 :=
+  S.parCoupling_eq_zero_of_partner hA fun s t _ => hstage s t
 
 /-! ### The midpoint relation and the balance -/
 

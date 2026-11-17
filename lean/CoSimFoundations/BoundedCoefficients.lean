@@ -56,14 +56,6 @@ variable {M : Type*} [AddCommGroup M] [Module ℝ M]
   [NormedAddCommGroup Y] [NormedSpace ℝ Y] {l : ℕ}
   {x : Fin l → ℝ} {W : Matrix (Fin l) (Fin l) ℝ}
 
-/-- The columns of `W` are dual to the powers at the nodes: `Σ_p x_q^p W p q' = δ_{qq'}`. -/
-theorem sum_pow_mul_eq (hW : W * Matrix.vandermonde x = 1) (q q' : Fin l) :
-    ∑ p : Fin l, x q ^ (p : ℕ) * W p q' = if q = q' then 1 else 0 := by
-  have hV : Matrix.vandermonde x * W = 1 := mul_eq_one_comm.1 hW
-  have h2 := congrFun (congrFun hV q) q'
-  rw [Matrix.mul_apply, Matrix.one_apply] at h2
-  exact h2
-
 /-- **Coefficients from their moments:** `Σ_p W p q' Σ_q x_q^p g_q = g_{q'}`. -/
 theorem sum_weights_moments (hW : W * Matrix.vandermonde x = 1) (g : Fin l → M) (q' : Fin l) :
     ∑ p : Fin l, W p q' • ∑ q : Fin l, x q ^ (p : ℕ) • g q = g q' := by
@@ -78,23 +70,6 @@ theorem sum_weights_moments (hW : W * Matrix.vandermonde x = 1) (g : Fin l → M
     _ = ∑ q : Fin l, (if q = q' then (1 : ℝ) else 0) • g q :=
         sum_congr rfl fun q _ => by rw [sum_pow_mul_eq hW]
     _ = g q' := by simp
-
-/-- The flow at a node is a combination of the combinations `ddComb`:
-`exp (x_q H A) v = Σ_p x_q^p ddComb p v`. -/
-theorem exp_node_apply_eq_sum (hW : W * Matrix.vandermonde x = 1) (A : E →L[ℝ] E) (H : ℝ)
-    (q : Fin l) (v : E) :
-    exp ((x q * H) • A) v = ∑ p : Fin l, x q ^ (p : ℕ) • ddComb A H x W p v := by
-  calc exp ((x q * H) • A) v
-      = ∑ q' : Fin l, (if q = q' then (1 : ℝ) else 0) • exp ((x q' * H) • A) v := by simp
-    _ = ∑ q' : Fin l, (∑ p : Fin l, x q ^ (p : ℕ) * W p q') • exp ((x q' * H) • A) v :=
-        sum_congr rfl fun q' _ => by rw [sum_pow_mul_eq hW]
-    _ = ∑ p : Fin l, ∑ q' : Fin l, (x q ^ (p : ℕ) * W p q') • exp ((x q' * H) • A) v := by
-        rw [sum_comm]
-        exact sum_congr rfl fun q' _ => by rw [sum_smul]
-    _ = ∑ p : Fin l, x q ^ (p : ℕ) • ddComb A H x W p v :=
-        sum_congr rfl fun p _ => by
-          rw [ddComb_apply, smul_sum]
-          exact sum_congr rfl fun q' _ => by rw [smul_smul]
 
 /-- **The samples from the divided differences:** for a positive macro step,
 `C exp (x_q H A) v = Σ_p x_q^p (H^p/p!) ddiff p v`. -/
@@ -202,60 +177,10 @@ theorem norm_pow_smul_proj_le_of_bound (hA : P ∘L A = Ai ∘L P + ∑ j, L j �
     (ha : ∀ j (k : Fin l), ‖H ^ (k : ℕ) • C j ((A ^ (k : ℕ)) v)‖ ≤ a j k) {m : ℕ}
     (hm : m ≤ l) :
     ‖H ^ m • P ((A ^ m) v)‖ ≤ H * ∑ k : Fin l, ∑ j, ‖L j‖ * a j k := by
-  have ha0 : ∀ j (k : Fin l), 0 ≤ a j k := fun j k => (norm_nonneg _).trans (ha j k)
-  set θ : ℕ → ℝ := fun k => if h : k < l then ∑ j, ‖L j‖ * a j ⟨k, h⟩ else 0 with hθ
-  have hθ0 : ∀ k, 0 ≤ θ k := fun k => by
-    rw [hθ]
-    dsimp only
-    split_ifs with h
-    · exact sum_nonneg fun j _ => mul_nonneg (norm_nonneg _) (ha0 j _)
-    · exact le_rfl
-  have hθsum : ∑ k ∈ range l, θ k = ∑ k : Fin l, ∑ j, ‖L j‖ * a j k := by
-    rw [← Fin.sum_univ_eq_sum_range θ l]
-    refine sum_congr rfl fun p _ => ?_
-    rw [hθ]
-    dsimp only
-    rw [dite_eq_left p.2]
-  have key : ∀ m, m ≤ l → ‖H ^ m • P ((A ^ m) v)‖ ≤ H * ∑ k ∈ range m, θ k := by
-    intro m
-    induction m with
-    | zero =>
-      intro _
-      simp [hPv]
-    | succ m ih =>
-      intro hm1
-      have hml : m < l := hm1
-      have h1 : H ^ m • (Ai (P ((A ^ m) v)) + ∑ j, L j (C j ((A ^ m) v))) =
-          Ai (H ^ m • P ((A ^ m) v)) + ∑ j, L j (H ^ m • C j ((A ^ m) v)) := by
-        simp only [smul_add, map_smul, smul_sum]
-      have hrec : H ^ (m + 1) • P ((A ^ (m + 1)) v) =
-          H • Ai (H ^ m • P ((A ^ m) v)) + H • ∑ j, L j (H ^ m • C j ((A ^ m) v)) := by
-        rw [proj_pow_succ_apply hA, pow_succ', mul_smul, h1, smul_add]
-      have h2 : ‖H • Ai (H ^ m • P ((A ^ m) v))‖ ≤ H * ∑ k ∈ range m, θ k := by
-        rw [norm_smul, Real.norm_eq_abs, abs_of_nonneg hH]
-        have h3 := Ai.le_opNorm (H ^ m • P ((A ^ m) v))
-        have h4 := ih hml.le
-        have h5 : H * ‖Ai (H ^ m • P ((A ^ m) v))‖ ≤
-            H * ‖Ai‖ * ‖H ^ m • P ((A ^ m) v)‖ := by
-          rw [mul_assoc]
-          exact mul_le_mul_of_nonneg_left h3 hH
-        have h6 : H * ‖Ai‖ * ‖H ^ m • P ((A ^ m) v)‖ ≤ 1 * ‖H ^ m • P ((A ^ m) v)‖ :=
-          mul_le_mul_of_nonneg_right hHAi (norm_nonneg _)
-        linarith
-      have h7 : ‖H • ∑ j, L j (H ^ m • C j ((A ^ m) v))‖ ≤ H * θ m := by
-        rw [norm_smul, Real.norm_eq_abs, abs_of_nonneg hH]
-        refine mul_le_mul_of_nonneg_left ?_ hH
-        rw [hθ]
-        dsimp only
-        rw [dite_eq_left hml]
-        refine norm_sum_le_of_le _ fun j _ => ?_
-        exact ((L j).le_opNorm _).trans
-          (mul_le_mul_of_nonneg_left (ha j ⟨m, hml⟩) (norm_nonneg _))
-      rw [hrec, sum_range_succ, mul_add]
-      exact (norm_add_le _ _).trans (add_le_add h2 h7)
-  refine (key m hm).trans (mul_le_mul_of_nonneg_left ?_ hH)
-  rw [← hθsum]
-  exact sum_le_sum_of_subset_of_nonneg (range_mono hm) fun k _ _ => hθ0 k
+  exact norm_pow_smul_proj_le_sum hA hH hHAi hPv (fun k : Fin l => ∑ j, ‖L j‖ * a j k)
+    (fun k => sum_nonneg fun j _ => mul_nonneg (norm_nonneg _) ((norm_nonneg _).trans (ha j k)))
+    (fun k => norm_sum_le_of_le _ fun j _ => ((L j).le_opNorm _).trans
+      (mul_le_mul_of_nonneg_left (ha j k) (norm_nonneg _))) hm
 
 /-- **The block row of the monolithic step from bounds of the derivatives of the outputs:**
 under the hypotheses of `norm_pow_smul_proj_le_of_bound` and `‖P‖ ≤ 1`,

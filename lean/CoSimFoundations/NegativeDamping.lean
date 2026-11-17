@@ -108,16 +108,6 @@ end Log
 
 variable {n : ℕ}
 
-/-- `|tr T| ≤ n ‖T‖` in the spectral norm. -/
-theorem abs_trace_le (T : Matrix (Fin n) (Fin n) ℝ) : |T.trace| ≤ n * ‖opE T‖ := by
-  have h1 : ∀ i, |T i i| ≤ ‖opE T‖ := fun i => by
-    have h := abs_inner_opE_le T (unitE i) (unitE i)
-    rwa [inner_unitE_opE, norm_unitE, mul_one, mul_one] at h
-  calc |T.trace| = |∑ i, T i i| := rfl
-    _ ≤ ∑ i, |T i i| := Finset.abs_sum_le_sum_abs _ _
-    _ ≤ ∑ _i : Fin n, ‖opE T‖ := Finset.sum_le_sum fun i _ => h1 i
-    _ = n * ‖opE T‖ := by simp
-
 open scoped Matrix.Norms.L2Operator in
 /-- **The determinant near the identity:** `det (1 + Z) = e^{tr log (1 + Z)}` for `‖Z‖ < 1`. -/
 theorem det_one_add_eq_exp {Z : Matrix (Fin n) (Fin n) ℝ} (hZ : ‖opE Z‖ < 1) :

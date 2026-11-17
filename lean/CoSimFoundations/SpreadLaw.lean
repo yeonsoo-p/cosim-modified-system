@@ -15,15 +15,16 @@ gives `|eᵀ S f + fᵀ S e| ≤ μ + ι`. There is no factor `n`.
 Proof: `u = e + f` and `v = e - f` have squared length `2`, and
 `uᵀ S u - vᵀ S v = 2 (eᵀ S f + fᵀ S e)`; the upper bound on one and the lower bound on the other.
 
-**2. The local form** (`abs_inner_add_inner_le_local`, `two_mul_abs_inner_le_local`,
-`spread_law_local`, `spread_law_local_symm`). With the lower bound alone:
+**2. The local form** (`abs_inner_add_inner_le_local` of `TripleLawGeneral.lean`,
+`two_mul_abs_inner_le_local`, `spread_law_local`, `spread_law_local_symm`). With the lower bound
+alone:
   `2 |eᵀ S f| ≤ eᵀ S e + fᵀ S f + 2 ι`
 (the lower bound on `u` and on `v`). Only the two vectors enter. This is the first step of the
 paper's proof of `thm:triple`: `P = S + ι` is positive semidefinite, hence
 `eᵀ P e + fᵀ P f ≥ 2 |eᵀ P f|`.
 
-**3. The spread form and the trace form** (`inner_le_trace_add`, `quadForm_le_trace_add`,
-`damping_add_injection_ge_of_spread`). The trace form of `TripleLawGeneral.lean`
+**3. The spread form and the trace form** (`inner_le_trace_add`, `quadForm_le_trace_add`).
+The trace form of `TripleLawGeneral.lean`
 (`damping_add_injection_ge`) is `2 |eᵀ S f| ≤ tr S + n ι`. If `-ι` is a lower bound of the form of
 an `n × n` matrix `S`, then `μ = tr S + (n - 1) ι` is an upper bound:
   `xᵀ S x ≤ (tr S + (n - 1) ι) · xᵀ x`
@@ -95,8 +96,7 @@ theorem abs_inner_add_inner_le_spread (T : E →ₗ[ℝ] E) {μ ι : ℝ}
     (hlo : ∀ x : E, -ι * ‖x‖ ^ 2 ≤ ⟪x, T x⟫) (hhi : ∀ x : E, ⟪x, T x⟫ ≤ μ * ‖x‖ ^ 2) {e f : E}
     (he : ‖e‖ = 1) (hf : ‖f‖ = 1) (hef : ⟪e, f⟫ = 0) :
     |⟪e, T f⟫ + ⟪f, T e⟫| ≤ μ + ι := by
-  have hp : ‖e + f‖ ^ 2 = 2 := by rw [norm_add_sq_real, he, hf, hef]; norm_num
-  have hm : ‖e - f‖ ^ 2 = 2 := by rw [norm_sub_sq_real, he, hf, hef]; norm_num
+  obtain ⟨hp, hm⟩ := norm_add_sq_of_orthonormal he hf hef
   have up := hhi (e + f)
   have lp := hlo (e + f)
   have um := hhi (e - f)
@@ -105,28 +105,6 @@ theorem abs_inner_add_inner_le_spread (T : E →ₗ[ℝ] E) {μ ι : ℝ}
   rw [hm, map_sub, inner_sub_left, inner_sub_right, inner_sub_right] at um lm
   rw [abs_le]
   constructor <;> linarith
-
-/-- **The local form for a linear map and an orthonormal pair.** If `-ι ‖x‖² ≤ ⟪x, T x⟫` for all
-`x`, then `|⟪e, T f⟫ + ⟪f, T e⟫| ≤ ⟪e, T e⟫ + ⟪f, T f⟫ + 2 ι` for orthonormal `e`, `f`. Only the
-lower bound is used, on `e + f` and on `e - f`. -/
-theorem abs_inner_add_inner_le_local (T : E →ₗ[ℝ] E) {ι : ℝ}
-    (hlo : ∀ x : E, -ι * ‖x‖ ^ 2 ≤ ⟪x, T x⟫) {e f : E} (he : ‖e‖ = 1) (hf : ‖f‖ = 1)
-    (hef : ⟪e, f⟫ = 0) :
-    |⟪e, T f⟫ + ⟪f, T e⟫| ≤ ⟪e, T e⟫ + ⟪f, T f⟫ + 2 * ι := by
-  have hp : ‖e + f‖ ^ 2 = 2 := by rw [norm_add_sq_real, he, hf, hef]; norm_num
-  have hm : ‖e - f‖ ^ 2 = 2 := by rw [norm_sub_sq_real, he, hf, hef]; norm_num
-  have lp := hlo (e + f)
-  have lm := hlo (e - f)
-  rw [hp, map_add, inner_add_left, inner_add_right, inner_add_right] at lp
-  rw [hm, map_sub, inner_sub_left, inner_sub_right, inner_sub_right] at lm
-  rw [abs_le]
-  constructor <;> linarith
-
-/-- For a self-adjoint linear map the bilinear form is symmetric: `⟪f, T e⟫ = ⟪e, T f⟫`. -/
-theorem inner_apply_comm_of_isSymmetric {T : E →ₗ[ℝ] E} (hT : T.IsSymmetric) (e f : E) :
-    ⟪f, T e⟫ = ⟪e, T f⟫ := by
-  rw [← hT f e]
-  exact real_inner_comm e (T f)
 
 /-- **The spread form for a self-adjoint linear map.** If `T` is self-adjoint and
 `-ι ‖x‖² ≤ ⟪x, T x⟫ ≤ μ ‖x‖²` for all `x` (as `μ = λ_max`, `ι = -λ_min`), then
@@ -163,27 +141,9 @@ theorem inner_le_trace_add_of_norm_eq_one (T : E →ₗ[ℝ] E) {ι : ℝ}
     intro v hv w hw
     rw [Set.mem_singleton_iff.1 hv, Set.mem_singleton_iff.1 hw, ite_eq_left rfl,
       real_inner_self_eq_norm_sq, he, one_pow]
-  -- an orthonormal basis that contains `e`
-  obtain ⟨u, b, hsub, hb⟩ := hon.exists_orthonormalBasis_extension
-  have heu : e ∈ u := Finset.mem_coe.1 (hsub (Set.mem_singleton e))
-  have hbi : ∀ i : u, b i = (i : E) := fun i => congrFun hb i
-  have htr : LinearMap.trace ℝ E T = ∑ x ∈ u, ⟪x, T x⟫ := by
-    rw [LinearMap.trace_eq_sum_inner T b, ← Finset.sum_coe_sort u (fun x => ⟪x, T x⟫)]
-    exact Finset.sum_congr rfl fun i _ => by rw [hbi i]
-  have hcard : finrank ℝ E = u.card := by
-    rw [finrank_eq_card_basis b.toBasis, Fintype.card_coe]
-  have hunit : ∀ x ∈ u, ‖x‖ = 1 := fun x hx => by
-    have h := b.orthonormal.1 ⟨x, hx⟩
-    rwa [hbi] at h
-  have hterm : ∀ x ∈ u, 0 ≤ ⟪x, T x⟫ + ι := fun x hx => by
-    have h := hι x
-    rw [hunit x hx] at h
-    linarith
-  have hsum : ∑ x ∈ u, (⟪x, T x⟫ + ι) = LinearMap.trace ℝ E T + (finrank ℝ E : ℝ) * ι := by
-    rw [Finset.sum_add_distrib, Finset.sum_const, nsmul_eq_mul, htr, hcard]
-  have hsingle : ⟪e, T e⟫ + ι ≤ ∑ x ∈ u, (⟪x, T x⟫ + ι) :=
-    Finset.single_le_sum (f := fun x => ⟪x, T x⟫ + ι) hterm heu
-  rw [hsum] at hsingle
+  rw [← Finset.coe_singleton] at hon
+  have h := sum_inner_sub_le_trace_sub T hι hon
+  rw [Finset.sum_singleton] at h
   linarith
 
 /-- **An upper bound of the form from the trace and a lower bound.** If `-ι ‖x‖² ≤ ⟪x, T x⟫` for
@@ -221,15 +181,10 @@ theorem spread_law (S : Matrix (Fin n) (Fin n) ℝ) {μ ι : ℝ}
     (hhi : ∀ x : Fin n → ℝ, x ⬝ᵥ (S *ᵥ x) ≤ μ * (x ⬝ᵥ x)) {e f : Fin n → ℝ}
     (he : e ⬝ᵥ e = 1) (hf : f ⬝ᵥ f = 1) (hef : e ⬝ᵥ f = 0) :
     |e ⬝ᵥ (S *ᵥ f) + f ⬝ᵥ (S *ᵥ e)| ≤ μ + ι := by
-  have hfe : f ⬝ᵥ e = 0 := by rw [dotProduct_comm]; exact hef
-  have up := hhi (e + f)
-  have lp := hlo (e + f)
-  have um := hhi (e - f)
-  have lm := hlo (e - f)
-  simp only [mulVec_add, add_dotProduct, dotProduct_add, he, hf, hef, hfe] at up lp
-  simp only [mulVec_sub, sub_dotProduct, dotProduct_sub, he, hf, hef, hfe] at um lm
-  rw [abs_le]
-  constructor <;> linarith
+  have h := abs_inner_add_inner_le_spread _ (le_inner_opE_of_le_dotProduct S hlo)
+    (inner_opE_le_of_dotProduct_le S hhi) (norm_toLp_eq_one_of_dotProduct_self he)
+    (norm_toLp_eq_one_of_dotProduct_self hf) ((inner_eq_dotProduct _ _).trans hef)
+  rwa [ContinuousLinearMap.coe_coe, inner_opE_eq_dotProduct, inner_opE_eq_dotProduct] at h
 
 /-- **The spread form** (the bound of Mirsky on the spread of a symmetric matrix, in the form of
 `thm:triple`). For a real symmetric matrix `S`, reals `μ`, `ι` with
@@ -241,9 +196,11 @@ theorem spread_law_symm (S : Matrix (Fin n) (Fin n) ℝ) (hS : S.IsSymm) {μ ι 
     (hhi : ∀ x : Fin n → ℝ, x ⬝ᵥ (S *ᵥ x) ≤ μ * (x ⬝ᵥ x)) {e f : Fin n → ℝ}
     (he : e ⬝ᵥ e = 1) (hf : f ⬝ᵥ f = 1) (hef : e ⬝ᵥ f = 0) :
     2 * |e ⬝ᵥ (S *ᵥ f)| ≤ μ + ι := by
-  have h := spread_law S hlo hhi he hf hef
-  rw [dotProduct_mulVec_comm_of_isSymm hS e f, ← two_mul, abs_mul, abs_two] at h
-  exact h
+  have h := two_mul_abs_inner_le_spread _ (isSymmetric_opE hS)
+    (le_inner_opE_of_le_dotProduct S hlo) (inner_opE_le_of_dotProduct_le S hhi)
+    (norm_toLp_eq_one_of_dotProduct_self he) (norm_toLp_eq_one_of_dotProduct_self hf)
+    ((inner_eq_dotProduct _ _).trans hef)
+  rwa [ContinuousLinearMap.coe_coe, inner_opE_eq_dotProduct] at h
 
 /-- **The local form for any matrix and any orthonormal pair.** If `-ι · xᵀ x ≤ xᵀ S x` for all
 `x`, then `|eᵀ S f + fᵀ S e| ≤ eᵀ S e + fᵀ S f + 2 ι` for orthonormal `e`, `f`. -/
@@ -251,13 +208,11 @@ theorem spread_law_local (S : Matrix (Fin n) (Fin n) ℝ) {ι : ℝ}
     (hlo : ∀ x : Fin n → ℝ, -ι * (x ⬝ᵥ x) ≤ x ⬝ᵥ (S *ᵥ x)) {e f : Fin n → ℝ}
     (he : e ⬝ᵥ e = 1) (hf : f ⬝ᵥ f = 1) (hef : e ⬝ᵥ f = 0) :
     |e ⬝ᵥ (S *ᵥ f) + f ⬝ᵥ (S *ᵥ e)| ≤ e ⬝ᵥ (S *ᵥ e) + f ⬝ᵥ (S *ᵥ f) + 2 * ι := by
-  have hfe : f ⬝ᵥ e = 0 := by rw [dotProduct_comm]; exact hef
-  have lp := hlo (e + f)
-  have lm := hlo (e - f)
-  simp only [mulVec_add, add_dotProduct, dotProduct_add, he, hf, hef, hfe] at lp
-  simp only [mulVec_sub, sub_dotProduct, dotProduct_sub, he, hf, hef, hfe] at lm
-  rw [abs_le]
-  constructor <;> linarith
+  have h := abs_inner_add_inner_le_local _ (le_inner_opE_of_le_dotProduct S hlo)
+    (norm_toLp_eq_one_of_dotProduct_self he) (norm_toLp_eq_one_of_dotProduct_self hf)
+    ((inner_eq_dotProduct _ _).trans hef)
+  simp only [ContinuousLinearMap.coe_coe, inner_opE_eq_dotProduct] at h
+  exact h
 
 /-- **The local form.** For a real symmetric matrix `S`, a real `ι` with `-ι · xᵀ x ≤ xᵀ S x` for
 all `x` (as `ι = -λ_min (S)`) and orthonormal vectors `e`, `f`:
@@ -266,8 +221,10 @@ theorem spread_law_local_symm (S : Matrix (Fin n) (Fin n) ℝ) (hS : S.IsSymm) {
     (hlo : ∀ x : Fin n → ℝ, -ι * (x ⬝ᵥ x) ≤ x ⬝ᵥ (S *ᵥ x)) {e f : Fin n → ℝ}
     (he : e ⬝ᵥ e = 1) (hf : f ⬝ᵥ f = 1) (hef : e ⬝ᵥ f = 0) :
     2 * |e ⬝ᵥ (S *ᵥ f)| ≤ e ⬝ᵥ (S *ᵥ e) + f ⬝ᵥ (S *ᵥ f) + 2 * ι := by
-  have h := spread_law_local S hlo he hf hef
-  rw [dotProduct_mulVec_comm_of_isSymm hS e f, ← two_mul, abs_mul, abs_two] at h
+  have h := two_mul_abs_inner_le_local _ (isSymmetric_opE hS)
+    (le_inner_opE_of_le_dotProduct S hlo) (norm_toLp_eq_one_of_dotProduct_self he)
+    (norm_toLp_eq_one_of_dotProduct_self hf) ((inner_eq_dotProduct _ _).trans hef)
+  simp only [ContinuousLinearMap.coe_coe, inner_opE_eq_dotProduct] at h
   exact h
 
 /-- **The upper bound that the trace gives.** If `-ι · xᵀ x ≤ xᵀ S x` for all `x`, then
@@ -276,29 +233,10 @@ theorem spread_law_local_symm (S : Matrix (Fin n) (Fin n) ℝ) (hS : S.IsSymm) {
 theorem quadForm_le_trace_add (S : Matrix (Fin n) (Fin n) ℝ) {ι : ℝ}
     (hι : ∀ x : Fin n → ℝ, -ι * (x ⬝ᵥ x) ≤ x ⬝ᵥ (S *ᵥ x)) (x : Fin n → ℝ) :
     x ⬝ᵥ (S *ᵥ x) ≤ (S.trace + ((n : ℝ) - 1) * ι) * (x ⬝ᵥ x) := by
-  have hι' : ∀ x : EuclideanSpace ℝ (Fin n), -ι * ‖x‖ ^ 2 ≤
-      ⟪x, ((opE S : EuclideanSpace ℝ (Fin n) →L[ℝ] EuclideanSpace ℝ (Fin n)) :
-        EuclideanSpace ℝ (Fin n) →ₗ[ℝ] EuclideanSpace ℝ (Fin n)) x⟫ := by
-    intro x
-    rw [← real_inner_self_eq_norm_sq, inner_eq_dotProduct, ContinuousLinearMap.coe_coe,
-      inner_opE_eq_dotProduct]
-    exact hι _
-  have h := inner_le_trace_add _ hι' (WithLp.toLp 2 x)
+  have h := inner_le_trace_add _ (le_inner_opE_of_le_dotProduct S hι) (WithLp.toLp 2 x)
   rw [trace_opE, finrank_euclideanSpace_fin, ContinuousLinearMap.coe_coe,
     inner_opE_eq_dotProduct, ← real_inner_self_eq_norm_sq, inner_eq_dotProduct] at h
   exact h
-
-/-- **The spread form implies the trace form.** `damping_add_injection_ge` of
-`TripleLawGeneral.lean` (Theorem `thm:triple`, `ν + n ι ≥ 2 |eᵀ S f|` with `ν = tr S`), proved
-from the spread form `spread_law_symm` with the upper bound `μ = tr S + (n - 1) ι` of
-`quadForm_le_trace_add`: `μ + ι = tr S + n ι`. The spread form with the least `μ` is at least as
-strong as the trace form. -/
-theorem damping_add_injection_ge_of_spread (S : Matrix (Fin n) (Fin n) ℝ) (hS : S.IsSymm)
-    {ι : ℝ} (hι : ∀ x : Fin n → ℝ, -ι * (x ⬝ᵥ x) ≤ x ⬝ᵥ (S *ᵥ x)) {e f : Fin n → ℝ}
-    (he : e ⬝ᵥ e = 1) (hf : f ⬝ᵥ f = 1) (hef : e ⬝ᵥ f = 0) :
-    2 * |e ⬝ᵥ (S *ᵥ f)| ≤ S.trace + n * ι := by
-  have h := spread_law_symm S hS hι (quadForm_le_trace_add S hι) he hf hef
-  linarith
 
 end MatrixForm
 
@@ -483,12 +421,7 @@ theorem Consistent.spread_forced_leg_sym (h : S.Consistent A U H a b c) {i j k :
   have h1 := h.spread_forced_leg hij hnp hnp' hki hkj h₁ h₂ hpq hqp hx hy hx1 hy1 hlo hhi
   have e : S.sg i k + ε₁ * ε₂ * S.sg j k = 2 * S.sg i k := by
     linear_combination S.sg i k * hsym - ε₁ * ε₂ * S.sg j k * S.sg_mul_self i k
-  have hσ : |S.sg i k| = 1 := by
-    unfold sg
-    by_cases hs : S.stage k < S.stage i
-    · rw [ite_eq_left hs, abs_one]
-    · rw [ite_eq_right hs, abs_neg, abs_one]
-  rw [e, abs_mul, abs_mul, abs_two, hσ] at h1
+  rw [e, abs_mul, abs_mul, abs_two, S.abs_sg i k] at h1
   linarith
 
 /-- **The spread form for power-conserving coupling and a single common partner that does not run
@@ -541,18 +474,8 @@ theorem Consistent.inner_signedCoupling_mul_eq_sgn (h : S.Consistent A U H a b c
     (hx : ∀ p, S.sub p ≠ s → x p = 0) (hy : ∀ q, S.sub q ≠ t → y q = 0) :
     ⟪x, opE (S.signedCoupling A * A) y⟫ = ⟪x, opE (A * S.sgn s * A) y⟫ := by
   refine inner_opE_congr hx hy fun p q hp hq => ?_
-  have h1 := S.sgn_row A p q
-  rw [hp] at h1
-  have h0 : (S.blockDiag A * A) p q = 0 := by
-    rw [Matrix.mul_apply]
-    refine Finset.sum_eq_zero fun r _ => ?_
-    rw [S.blockDiag_apply]
-    by_cases hr : S.sub p = S.sub r
-    · have hrq : S.sub r ≠ S.sub q := by rw [← hr, hp, hq]; exact hst
-      have hnrq : ¬ S.partner (S.sub r) (S.sub q) := by rw [← hr, hp, hq]; exact hnp
-      rw [h.hA r q hrq hnrq, mul_zero]
-    · rw [ite_eq_right hr, zero_mul]
-  rw [h1, h0, sub_zero]
+  obtain ⟨hne, hnp', -⟩ := S.sub_ne_of_eq hst hnp hp hq
+  rw [S.signedCoupling_mul_apply_eq_sgn h.hA hne hnp', hp]
 
 /-- **The symmetric combination of the half-step term for power-conserving coupling.** For a
 consistent scheme with `A q p = -A p q` between different subsystems, subsystems `i ≠ j` that are
@@ -602,18 +525,8 @@ theorem Consistent.spread_forced_jacobi (h : S.Consistent A U H a b c)
     (hlo : ∀ v : EuclideanSpace ℝ (Fin n), -ι * ‖v‖ ^ 2 ≤ ⟪v, opE (S.X - U) v⟫)
     (hhi : ∀ v : EuclideanSpace ℝ (Fin n), ⟪v, opE (S.X - U) v⟫ ≤ μ * ‖v‖ ^ 2) :
     H ^ 2 * |⟪x, opE (A * A) y⟫| - 2 * reactionC a b c ‖opE A‖ H * H ^ 3 ≤ μ + ι := by
-  have hsg : ∀ s k : κ, S.sg s k = -1 := fun s k => by
-    have hlt : ¬ S.stage k < S.stage s := by rw [hJ k s]; exact lt_irrefl _
-    unfold sg
-    rw [ite_eq_right hlt]
-  have e : A * (S.sgn i + S.sgn j) * A = (-2 : ℝ) • (A * A) := by
-    ext p q
-    rw [S.sgn_add_entry, Matrix.smul_apply, Matrix.mul_apply, smul_eq_mul, Finset.mul_sum]
-    refine Finset.sum_congr rfl fun r _ => ?_
-    rw [hsg, hsg]
-    ring
   have h1 := h.spread_forced_skew hskew hij hnp hnp' hx hy hx1 hy1 hlo hhi
-  rw [e, inner_opE_smul, abs_mul, abs_neg, abs_two] at h1
+  rw [mul_sgn_add_mul_of_jacobi hJ, inner_opE_smul, abs_mul, abs_neg, abs_two] at h1
   linarith
 
 end Forced

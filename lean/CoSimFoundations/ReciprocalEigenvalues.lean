@@ -244,15 +244,6 @@ theorem zoh_jacobi_reciprocal (hJ : ∀ s t, S.stage s = S.stage t)
 
 /-! ### (c) The zero-order hold of subsystems without dynamics -/
 
-/-- `φ₁(0) = 1`. -/
-theorem phiOne_zero_eq_one : phiOne (0 : Matrix (Fin n) (Fin n) ℝ) = 1 := by
-  have h2 := (hasSum_phiOne (0 : Matrix (Fin n) (Fin n) ℝ)).unique
-    (hasSum_single (f := fun j : ℕ => (((j + 1).factorial : ℕ) : ℝ)⁻¹ •
-      (0 : Matrix (Fin n) (Fin n) ℝ) ^ j) 0 fun j hj => by
-        rw [zero_pow hj, smul_zero])
-  rw [h2]
-  simp
-
 /-- For subsystems without dynamics of their own, `A₀ = 0`, the coefficients of the samples of
 the zero-order hold add up to `H A`. -/
 theorem zoh_N_add_M_of_blockDiag_eq_zero {A : Matrix (Fin n) (Fin n) ℝ}

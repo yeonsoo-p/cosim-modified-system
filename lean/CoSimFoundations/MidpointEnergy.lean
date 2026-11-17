@@ -42,6 +42,7 @@ The bounds of the form `Q` in (d) are hypotheses.
 -/
 import CoSimFoundations.StoredEnergy
 import CoSimFoundations.HalfStepZOH
+import CoSimFoundations.BarrierConstants
 
 open Matrix
 open scoped RealInnerProductSpace
@@ -114,11 +115,21 @@ theorem commute_phiOne {B Z : Matrix (Fin n) (Fin n) ℝ} (h : Commute B Z) :
   rw [e] at h1
   exact h1.unique h2
 
+/-- `φ₁(0) = 1`. -/
+theorem _root_.CoSimFoundations.HeldScheme.phiOne_zero_eq_one :
+    phiOne (0 : Matrix (Fin n) (Fin n) ℝ) = 1 := by
+  have h2 := (hasSum_phiOne (0 : Matrix (Fin n) (Fin n) ℝ)).unique
+    (hasSum_single (f := fun j : ℕ => (((j + 1).factorial : ℕ) : ℝ)⁻¹ •
+      (0 : Matrix (Fin n) (Fin n) ℝ) ^ j) 0 fun j hj => by
+        rw [zero_pow hj, smul_zero])
+  rw [h2]
+  simp
+
+open scoped Matrix.Norms.Operator in
 /-- `e^Z e^{-Z} = 1` for a real matrix. -/
 theorem exp_mul_exp_neg (Z : Matrix (Fin n) (Fin n) ℝ) :
-    NormedSpace.exp Z * NormedSpace.exp (-Z) = 1 := by
-  rw [← Matrix.exp_add_of_commute _ _ (Commute.refl Z).neg_right, add_neg_cancel,
-    NormedSpace.exp_zero]
+    NormedSpace.exp Z * NormedSpace.exp (-Z) = 1 :=
+  _root_.CoSimFoundations.exp_mul_exp_neg Z
 
 /-- **The transpose of the inverse of `φ₁(H A₀)` for a lossless `A₀`.** If `A₀ᵀ = -A₀` and `φi`
 is a left inverse of `φ = φ₁(H A₀)`, then `φiᵀ = φi + H A₀`: `φᵀ = φ₁(-H A₀) = e^{-H A₀} φ` and
@@ -195,6 +206,40 @@ theorem inner_opE_self_of_skew (hA : Aᵀ = -A) (y : EuclideanSpace ℝ (Fin n))
   rw [hA, opE_neg, _root_.neg_apply, inner_neg_right] at h
   linarith
 
+/-- For a skew matrix, `uᵀ A v = -(A u)ᵀ v`. -/
+theorem inner_opE_of_skew (hA : Aᵀ = -A) (u v : EuclideanSpace ℝ (Fin n)) :
+    ⟪u, opE A v⟫ = -⟪opE A u, v⟫ := by
+  rw [OneStep.inner_opE_transpose A v u, hA, opE_neg, _root_.neg_apply, inner_neg_right,
+    real_inner_comm]
+
+/-- **The balance of one step with a remainder.** If `(Q + R) (X - 1) = (H/2) A (X + 1)` and
+`Qᵀ = Q`, then for every `x`, with `x' = X x` and `x̄ = ½ (x' + x)`:
+`½ (x'ᵀ Q x' - xᵀ Q x) = H x̄ᵀ A x̄ - x̄ᵀ R (x' - x)`. Nothing is assumed about `R`: multiply the
+relation on `x` by `x̄ᵀ`; `x̄ᵀ Q (x' - x) = ½ (x'ᵀ Q x' - xᵀ Q x)` because `Q` is symmetric. -/
+theorem energy_balance_rem_of_rel {R : Matrix (Fin n) (Fin n) ℝ}
+    (hmid : (Q + R) * (X - 1) = (H / 2) • (A * (X + 1))) (hQ : Qᵀ = Q)
+    (x : EuclideanSpace ℝ (Fin n)) :
+    1 / 2 * (⟪opE X x, opE Q (opE X x)⟫ - ⟪x, opE Q x⟫) =
+      H * ⟪(1 / 2 : ℝ) • (opE X x + x), opE A ((1 / 2 : ℝ) • (opE X x + x))⟫ -
+        ⟪(1 / 2 : ℝ) • (opE X x + x), opE R (opE X x - x)⟫ := by
+  have hv : opE Q (opE X x - x) + opE R (opE X x - x) = (H / 2) • opE A (opE X x + x) := by
+    have h := congrArg (fun M => opE M x) hmid
+    simpa only [opE_mul_apply, opE_add, opE_sub, opE_smul, opE_one, _root_.add_apply,
+      _root_.sub_apply, _root_.smul_apply, one_apply_eq_self] using h
+  have hsym : ⟪x, opE Q (opE X x)⟫ = ⟪opE X x, opE Q x⟫ := by
+    rw [OneStep.inner_opE_transpose Q (opE X x) x, hQ]
+  have hQd : ⟪opE X x + x, opE Q (opE X x - x)⟫ =
+      ⟪opE X x, opE Q (opE X x)⟫ - ⟪x, opE Q x⟫ := by
+    rw [map_sub, inner_sub_right, inner_add_left, inner_add_left, hsym]
+    ring
+  have h1 : ⟪opE X x + x, opE Q (opE X x - x)⟫ + ⟪opE X x + x, opE R (opE X x - x)⟫ =
+      H / 2 * ⟪opE X x + x, opE A (opE X x + x)⟫ := by
+    have h := congrArg (fun v => ⟪opE X x + x, v⟫) hv
+    simpa only [inner_add_right, real_inner_smul_right] using h
+  rw [hQd] at h1
+  simp only [map_smul, real_inner_smul_left, real_inner_smul_right]
+  linear_combination (1 / 2 : ℝ) * h1
+
 /-- **(b) The exact balance of one step, from the midpoint relation.** If
 `(Q + (H/2) A_par) (X - 1) = (H/2) A (X + 1)`, `Qᵀ = Q` and `A_parᵀ = -A_par`, then for every
 `x`, with `x' = X x` and `x̄ = ½ (x' + x)`:
@@ -205,29 +250,10 @@ theorem energy_balance_of_rel
     1 / 2 * (⟪opE X x, opE Q (opE X x)⟫ - ⟪x, opE Q x⟫) =
       H * ⟪(1 / 2 : ℝ) • (opE X x + x), opE A ((1 / 2 : ℝ) • (opE X x + x))⟫ +
         H / 2 * ⟪opE Apar ((1 / 2 : ℝ) • (opE X x + x)), opE X x - x⟫ := by
-  have hv : opE Q (opE X x - x) + (H / 2) • opE Apar (opE X x - x) =
-      (H / 2) • opE A (opE X x + x) := by
-    have h := congrArg (fun M => opE M x) hmid
-    simpa only [opE_mul_apply, opE_add, opE_sub, opE_smul, opE_one, _root_.add_apply,
-      _root_.sub_apply, _root_.smul_apply, one_apply_eq_self] using h
-  have hsym : ⟪x, opE Q (opE X x)⟫ = ⟪opE X x, opE Q x⟫ := by
-    rw [OneStep.inner_opE_transpose Q (opE X x) x, hQ]
-  have hp : ⟪opE X x + x, opE Apar (opE X x - x)⟫ =
-      -⟪opE Apar (opE X x + x), opE X x - x⟫ := by
-    rw [OneStep.inner_opE_transpose Apar (opE X x - x) (opE X x + x), hpar, opE_neg,
-      _root_.neg_apply, inner_neg_right, real_inner_comm]
-  have hQd : ⟪opE X x + x, opE Q (opE X x - x)⟫ =
-      ⟪opE X x, opE Q (opE X x)⟫ - ⟪x, opE Q x⟫ := by
-    rw [map_sub, inner_sub_right, inner_add_left, inner_add_left, hsym]
-    ring
-  have h1 : ⟪opE X x + x, opE Q (opE X x - x)⟫ +
-      H / 2 * ⟪opE X x + x, opE Apar (opE X x - x)⟫ =
-      H / 2 * ⟪opE X x + x, opE A (opE X x + x)⟫ := by
-    have h := congrArg (fun v => ⟪opE X x + x, v⟫) hv
-    simpa only [inner_add_right, real_inner_smul_right] using h
-  rw [hQd, hp] at h1
-  simp only [map_smul, real_inner_smul_left, real_inner_smul_right]
-  linear_combination (1 / 2 : ℝ) * h1
+  have h := energy_balance_rem_of_rel hmid hQ x
+  simp only [opE_smul, _root_.smul_apply, real_inner_smul_right] at h
+  rw [inner_opE_of_skew hpar] at h
+  linear_combination h
 
 /-- **(b) The exact balance of one step for a lossless network, from the midpoint relation.** If
 moreover `Aᵀ = -A`: `x'ᵀ Q x' - xᵀ Q x = H (A_par x̄)ᵀ (x' - x)`, `x' = X x`, `x̄ = ½ (x' + x)`.

@@ -107,33 +107,8 @@ theorem row_accumulation_aux (Q : E →L[ℝ] F) (M : ℕ → E →L[ℝ] F) (l 
         -(Q (∑ k ∈ Ico (l - 1) K, e k) - ∑ r ∈ range l, M r (∑ k ∈ Ico (l - 1) K, e k)) +
           ∑ r ∈ range l,
             M r (∑ k ∈ Ico (l - 1 - r) (l - 1), e k - ∑ k ∈ Ico (K - r) K, e k) -
-          Q (e K - e (l - 1)) := by
-  intro K hK
-  induction K, hK using Nat.le_induction with
-  | base =>
-    intro _
-    simp
-  | succ K hK ih =>
-    intro h
-    have ih' := ih fun k hk hkK => h k hk (Nat.lt_succ_of_lt hkK)
-    have hs := h K hK (Nat.lt_succ_self K)
-    have htele : ∀ r ∈ range l,
-        M r (∑ k ∈ Ico (l - 1 - r) (l - 1), e k - ∑ k ∈ Ico (K + 1 - r) (K + 1), e k) =
-          M r (∑ k ∈ Ico (l - 1 - r) (l - 1), e k - ∑ k ∈ Ico (K - r) K, e k) -
-            M r (e K) + M r (e (K - r)) := by
-      intro r hr
-      have hr' := mem_range.1 hr
-      rw [sum_Ico_shift_succ e (by omega : r ≤ K)]
-      simp only [map_sub, map_add]
-      abel
-    have e1 : Q (∑ k ∈ Ico (l - 1) K, e k + e K) = Q (∑ k ∈ Ico (l - 1) K, e k) + Q (e K) :=
-      map_add Q _ _
-    have e2 : ∀ r ∈ range l, M r (∑ k ∈ Ico (l - 1) K, e k + e K) =
-        M r (∑ k ∈ Ico (l - 1) K, e k) + M r (e K) := fun r _ => map_add (M r) _ _
-    rw [sum_Ico_succ_top hK, sum_Ico_succ_top hK, ih', hs, e1, sum_congr rfl e2,
-      sum_congr rfl htele, sum_add_distrib, sum_add_distrib, sum_sub_distrib,
-      map_sub Q (e (K + 1)), map_sub Q (e K)]
-    abel
+          Q (e K - e (l - 1)) :=
+  accumulation_additive Q M l t e
 
 /-- The bound of the accumulated defect in one row: if `‖e_k‖ ≤ d` for `k ≤ K`, `K ≥ l ≥ 1`,
 then `‖Σ_{k=l-1}^{K-1} t_k‖ ≤ d (2 ‖Q‖ + 2 Σ_r r ‖M r‖ + (K - l + 1) ‖Q - Σ_r M r‖)`. -/
@@ -144,53 +119,12 @@ theorem norm_row_accumulation_aux_le (Q : E →L[ℝ] F) (M : ℕ → E →L[ℝ
     ‖∑ k ∈ Ico (l - 1) K, t k‖ ≤
       d * (2 * ‖Q‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ +
         ((K : ℝ) - l + 1) * ‖Q - ∑ r ∈ range l, M r‖) := by
-  rw [row_accumulation_aux Q M l t e K (by omega) h]
-  have h1 : ‖Q (∑ k ∈ Ico (l - 1) K, e k) - ∑ r ∈ range l, M r (∑ k ∈ Ico (l - 1) K, e k)‖ ≤
-      ‖Q - ∑ r ∈ range l, M r‖ * (((K : ℝ) - l + 1) * d) := by
-    have e0 : Q (∑ k ∈ Ico (l - 1) K, e k) - ∑ r ∈ range l, M r (∑ k ∈ Ico (l - 1) K, e k) =
-        (Q - ∑ r ∈ range l, M r) (∑ k ∈ Ico (l - 1) K, e k) := by
-      rw [_root_.sub_apply, _root_.sum_apply]
-    rw [e0]
-    refine (ContinuousLinearMap.le_opNorm _ _).trans
-      (mul_le_mul_of_nonneg_left ?_ (norm_nonneg _))
-    have h' := norm_sum_Ico_le e (a := l - 1) (b := K) (K := K) (by omega) hd
-    have hc : ((K - (l - 1) : ℕ) : ℝ) = (K : ℝ) - l + 1 := by
-      rw [Nat.cast_sub (by omega), Nat.cast_sub hl]
-      push_cast
-      ring
-    rwa [hc] at h'
-  have h2 : ‖∑ r ∈ range l,
-      M r (∑ k ∈ Ico (l - 1 - r) (l - 1), e k - ∑ k ∈ Ico (K - r) K, e k)‖ ≤
-      ∑ r ∈ range l, ‖M r‖ * (2 * ((r : ℝ) * d)) := by
-    refine norm_sum_le_of_le _ fun r hr => ?_
-    have hr' := mem_range.1 hr
-    refine (ContinuousLinearMap.le_opNorm _ _).trans
-      (mul_le_mul_of_nonneg_left ?_ (norm_nonneg _))
-    have ha := norm_sum_Ico_le e (a := l - 1 - r) (b := l - 1) (K := K) (by omega) hd
-    have hb := norm_sum_Ico_le e (a := K - r) (b := K) (K := K) (by omega) hd
-    have hca : l - 1 - (l - 1 - r) = r := by omega
-    have hcb : K - (K - r) = r := by omega
-    rw [hca] at ha
-    rw [hcb] at hb
-    exact (norm_sub_le _ _).trans (by linarith)
-  have h3 : ‖Q (e K - e (l - 1))‖ ≤ ‖Q‖ * (2 * d) := by
-    refine (ContinuousLinearMap.le_opNorm _ _).trans
-      (mul_le_mul_of_nonneg_left ?_ (norm_nonneg _))
-    exact (norm_sub_le _ _).trans (by linarith [hd K le_rfl, hd (l - 1) (by omega)])
-  have h4 : ∑ r ∈ range l, ‖M r‖ * (2 * ((r : ℝ) * d)) =
-      d * (2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖) := by
-    rw [mul_sum, mul_sum]
-    exact sum_congr rfl fun r _ => by ring
-  have h5 := norm_sub_le
-    (-(Q (∑ k ∈ Ico (l - 1) K, e k) - ∑ r ∈ range l, M r (∑ k ∈ Ico (l - 1) K, e k)) +
-      ∑ r ∈ range l, M r (∑ k ∈ Ico (l - 1 - r) (l - 1), e k - ∑ k ∈ Ico (K - r) K, e k))
-    (Q (e K - e (l - 1)))
-  have h6 := norm_add_le
-    (-(Q (∑ k ∈ Ico (l - 1) K, e k) - ∑ r ∈ range l, M r (∑ k ∈ Ico (l - 1) K, e k)))
-    (∑ r ∈ range l, M r (∑ k ∈ Ico (l - 1 - r) (l - 1), e k - ∑ k ∈ Ico (K - r) K, e k))
-  rw [norm_neg] at h6
-  rw [h4] at h2
-  linarith
+  have hβ : ∀ v, ‖Q v - ∑ r ∈ range l, M r v‖ ≤ ‖Q - ∑ r ∈ range l, M r‖ * ‖v‖ := by
+    intro v
+    have h1 := (Q - ∑ r ∈ range l, M r).le_opNorm v
+    rwa [_root_.sub_apply, _root_.sum_apply] at h1
+  exact norm_accumulation_additive_le Q M hl hK t e h (norm_nonneg Q)
+    (fun r => norm_nonneg (M r)) (norm_nonneg _) Q.le_opNorm (fun r => (M r).le_opNorm) hβ hd
 
 /-- `‖B‖ ≤ ‖T_i‖ + ‖P - N‖ ‖U - 1‖ + Σ_r ‖M r‖ ‖Ui^r - 1‖` for the row of one subsystem. -/
 theorem norm_rowBalance_le (P N : E →L[ℝ] F) (M : ℕ → E →L[ℝ] F) (U Ui : E →L[ℝ] E) (l : ℕ) :
@@ -219,11 +153,6 @@ section Constant
 variable {E F : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpace E] [Nontrivial E]
   [NormedAddCommGroup F] [NormedSpace ℝ F]
 
-/-- The reference step has the inverse `exp (-(H • A))`. -/
-private theorem exp_neg_mul_exp_row (Z : E →L[ℝ] E) : exp (-Z) * exp Z = 1 := by
-  let _ : NormedAlgebra ℚ (E →L[ℝ] E) := NormedAlgebra.restrictScalars ℚ ℝ (E →L[ℝ] E)
-  rw [← exp_add_of_commute (Commute.refl Z).neg_left, neg_add_cancel, exp_zero]
-
 /-- The constant of the row: with `‖Q‖ ≤ 1 + n̄`, `n̄ ≥ 0`, `‖M r‖ ≤ m̄` for `1 ≤ r < l`,
 `1 ≤ l ≤ K` and `K H ‖A‖ ≤ 1/2`,
 `2 ‖Q‖ + 2 Σ_r r ‖M r‖ + (K - l + 1) (‖Q‖ ‖U - 1‖ + Σ_r ‖M r‖ ‖U^{-r} - 1‖)`
@@ -236,8 +165,7 @@ theorem run_row_constant_le (A : E →L[ℝ] E) (Q : E →L[ℝ] F) (M : ℕ →
         ((K : ℝ) - l + 1) * (‖Q‖ * ‖exp (H • A) - 1‖ +
           ∑ r ∈ range l, ‖M r‖ * ‖exp (-(H • A)) ^ r - 1‖) ≤
       2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) := by
-  have hlK : (l : ℝ) ≤ K := by exact_mod_cast hK
-  have hK' : (0 : ℝ) ≤ (K : ℝ) - l + 1 := by linarith
+  have hK' : (0 : ℝ) ≤ (K : ℝ) - l + 1 := (run_length_pos hK).le
   -- the same inequality for scalar operators with the norms `1 + n̄` and `‖M r‖`
   have e1 : (1 : E →L[ℝ] E) - (-nbar) • (1 : E →L[ℝ] E) = (1 + nbar) • (1 : E →L[ℝ] E) := by
     rw [neg_smul, sub_neg_eq_add, add_smul, one_smul]
@@ -272,24 +200,9 @@ theorem norm_rowDefect_le_of_runs (A : E →L[ℝ] E) (P N : E →L[ℝ] F) (M :
     ‖rowDefect P N M (exp (H • A)) (exp (-(H • A))) l‖ ≤
       δ * ‖S'‖ * (2 * ‖P - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ +
         ((K : ℝ) - l + 1) * ‖rowBalance P N M l‖) := by
-  have hb : 0 ≤ 2 * ‖P - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ +
-      ((K : ℝ) - l + 1) * ‖rowBalance P N M l‖ := by
-    have hlK : (l : ℝ) ≤ K := by exact_mod_cast hK
-    have h1 : (0 : ℝ) ≤ ∑ r ∈ range l, (r : ℝ) * ‖M r‖ := sum_nonneg fun r _ => by positivity
-    have h2 : 0 ≤ ((K : ℝ) - l + 1) * ‖rowBalance P N M l‖ :=
-      mul_nonneg (by linarith) (norm_nonneg _)
-    have := norm_nonneg (P - N)
-    linarith
-  refine ContinuousLinearMap.opNorm_le_bound _
-    (mul_nonneg (mul_nonneg hδ0 (norm_nonneg _)) hb) fun v => ?_
-  rcases eq_or_ne v 0 with rfl | hv
-  · simp
+  refine opNorm_le_of_right_inverse hS _ hδ0 (run_factor_nonneg _ M _ hK) fun v hx0 => ?_
   have hSv : (∑ k ∈ Ico (l - 1) K, exp (H • A) ^ k) (S' v) = v := by
     rw [← mul_apply_eq_comp, hS, one_apply_eq_self]
-  have hx0 : S' v ≠ 0 := by
-    intro h0
-    rw [h0, map_zero] at hSv
-    exact hv hSv.symm
   have hsum : ∑ k ∈ Ico (l - 1) K,
       rowDefect P N M (exp (H • A)) (exp (-(H • A))) l ((exp (H • A) ^ k) (S' v)) =
       rowDefect P N M (exp (H • A)) (exp (-(H • A))) l v := by
@@ -297,20 +210,11 @@ theorem norm_rowDefect_le_of_runs (A : E →L[ℝ] E) (P N : E →L[ℝ] F) (M :
   have h := norm_row_accumulation_aux_le (P - N) M hl hK
     (fun k => rowDefect P N M (exp (H • A)) (exp (-(H • A))) l ((exp (H • A) ^ k) (S' v)))
     (fun k => x (S' v) k - (exp (H • A) ^ k) (S' v))
-    (fun k hk hkK => rowDefect_apply_pow (exp_neg_mul_exp_row (H • A)) hk (S' v) (x (S' v))
+    (fun k hk hkK => rowDefect_apply_pow (exp_neg_mul_exp (H • A)) hk (S' v) (x (S' v))
       (hx (S' v) hx0 k hk hkK))
     (hδ (S' v) hx0)
   rw [hsum] at h
-  refine h.trans ?_
-  have h3 : δ * ‖S' v‖ ≤ δ * ‖S'‖ * ‖v‖ := by
-    rw [mul_assoc]
-    exact mul_le_mul_of_nonneg_left (S'.le_opNorm v) hδ0
-  calc δ * ‖S' v‖ * (2 * ‖P - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ +
-        ((K : ℝ) - l + 1) * ‖rowBalance P N M l‖)
-      ≤ δ * ‖S'‖ * ‖v‖ * (2 * ‖P - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ +
-        ((K : ℝ) - l + 1) * ‖rowBalance P N M l‖) := mul_le_mul_of_nonneg_right h3 hb
-    _ = δ * ‖S'‖ * (2 * ‖P - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ +
-        ((K : ℝ) - l + 1) * ‖rowBalance P N M l‖) * ‖v‖ := by ring
+  exact h
 
 end Constant
 
@@ -339,27 +243,16 @@ theorem run_order_row (A : E →L[ℝ] E) (P N : E →L[ℝ] F) (M : ℕ → E �
     0.35 * (((K : ℝ) - l + 1) * ‖rowDefect P N M (exp (H • A)) (exp (-(H • A))) l‖) /
       (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) +
         ((K : ℝ) - l + 1) * ‖rowDefect P N M (exp (H • A)) (exp (-(H • A))) l‖) ≤ δ := by
-  have hδ0 : 0 ≤ δ := by
-    obtain ⟨y, hy⟩ := exists_ne (0 : E)
-    have h := (norm_nonneg _).trans (hδ y hy 0 (Nat.zero_le _))
-    exact nonneg_of_mul_nonneg_left h (norm_pos_iff.2 hy)
-  have hlK : (l : ℝ) ≤ K := by exact_mod_cast hK
-  have hK' : (0 : ℝ) < (K : ℝ) - l + 1 := by linarith
-  have he := exp_half_lt
+  have hδ0 := relative_error_bound_nonneg hδ
+  have hK' := run_length_pos hK
   have hn : 0 ≤ nbar := (norm_nonneg N).trans hN
   have hQ : ‖P - N‖ ≤ 1 + nbar := (norm_sub_le P N).trans (add_le_add hP hN)
   obtain ⟨S', hS, hS'⟩ := exists_sum_Ico_pow_right_inverse A hH hl hK hKH
-  have hT := norm_rowDefect_le_of_runs A P N M hl hK x hx hδ0 hδ hS
-  have hconst := run_row_constant_le A (P - N) M hH hl hK hKH hn hQ hM
-  have hb : 0 ≤ 2 * ‖P - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ :=
-    add_nonneg (by positivity)
-      (mul_nonneg (by norm_num) (sum_nonneg fun r _ => by positivity))
-  have hs : ‖S'‖ ≤ 1 / (0.35 * ((K : ℝ) - l + 1)) := by
-    refine hS'.trans (one_div_le_one_div_of_le (by positivity) ?_)
-    exact mul_le_mul_of_nonneg_right (by linarith) hK'.le
-  have hβ := norm_rowBalance_le P N M (exp (H • A)) (exp (-(H • A))) l
-  rw [add_assoc] at hβ
-  exact fraction_of_le hδ0 hK' hb (norm_nonneg _) hs hβ hconst hT
+  have hb : 0 ≤ 2 * ‖P - N‖ + 2 * ∑ r ∈ range l, (r : ℝ) * ‖M r‖ := by positivity
+  exact fraction_of_le hδ0 hK' hb (norm_nonneg _) (le_one_div_of_le_one_div_exp_half hK' hS')
+    ((norm_rowBalance_le P N M (exp (H • A)) (exp (-(H • A))) l).trans_eq (add_assoc _ _ _))
+    (run_row_constant_le A (P - N) M hH hl hK hKH hn hQ hM)
+    (norm_rowDefect_le_of_runs A P N M hl hK x hx hδ0 hδ hS)
 
 /-- **The bound over a run for one block row, with a lower bound of the local defect:** in the
 setting of `run_order_row`, if `0 ≤ τ ≤ ‖T_i‖`, then
@@ -376,16 +269,9 @@ theorem run_order_row_of_le (A : E →L[ℝ] E) (P N : E →L[ℝ] F) (M : ℕ �
     0.35 * (((K : ℝ) - l + 1) * τ) /
       (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) + ((K : ℝ) - l + 1) * τ) ≤ δ := by
   refine le_trans ?_ (run_order_row A P N M hH hl hK hKH hP hN hM x hx hδ)
-  have hlK : (l : ℝ) ≤ K := by exact_mod_cast hK
-  have hl1 : (1 : ℝ) ≤ l := by exact_mod_cast hl
-  have hK' : (0 : ℝ) < (K : ℝ) - l + 1 := by linarith
+  have hK' := run_length_pos hK
   have hn : 0 ≤ nbar := (norm_nonneg N).trans hN
-  have hm : 0 ≤ mbar * ((l : ℝ) * (l - 1)) := by
-    rcases hl.eq_or_lt with h1 | h1
-    · subst h1
-      simp
-    · exact mul_nonneg ((norm_nonneg _).trans (hM 1 le_rfl h1))
-        (mul_nonneg (by linarith) (by linarith))
+  have hm := bound_mul_pred_nonneg hl hM
   have hbpos : 0 < 2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) := by linarith
   have h1 : 0 ≤ ((K : ℝ) - l + 1) * τ := mul_nonneg hK'.le hτ0
   have h2 : ((K : ℝ) - l + 1) * τ ≤
@@ -408,10 +294,8 @@ theorem run_order_row_isLUB (A : E →L[ℝ] E) (P N : E →L[ℝ] F) (M : ℕ �
       e = ‖x x0 k - (exp (H • A) ^ k) x0‖ / ‖x0‖} ε) :
     0.35 * (((K : ℝ) - l + 1) * ‖rowDefect P N M (exp (H • A)) (exp (-(H • A))) l‖) /
       (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) +
-        ((K : ℝ) - l + 1) * ‖rowDefect P N M (exp (H • A)) (exp (-(H • A))) l‖) ≤ ε := by
-  refine run_order_row A P N M hH hl hK hKH hP hN hM x hx fun x0 hx0 k hk => ?_
-  have h := hε.1 ⟨x0, hx0, k, hk, rfl⟩
-  rwa [div_le_iff₀ (norm_pos_iff.2 hx0)] at h
+        ((K : ℝ) - l + 1) * ‖rowDefect P N M (exp (H • A)) (exp (-(H • A))) l‖) ≤ ε :=
+  run_order_row A P N M hH hl hK hKH hP hN hM x hx (relative_error_le_of_isLUB hε)
 
 /-- **The bound over a run for one block row, as a statement about single sequences:** for every
 `c` below `0.35 T_K / (b_i + T_K)` there are an initial state `x_0 ≠ 0` and a step `k ≤ K` at
@@ -427,13 +311,9 @@ theorem exists_run_order_row (A : E →L[ℝ] E) (P N : E →L[ℝ] F) (M : ℕ 
         ‖rowDefect P N M (exp (H • A)) (exp (-(H • A))) l‖) /
       (2.65 * (1 + nbar) + 1.42 * mbar * ((l : ℝ) * (l - 1)) +
         ((K : ℝ) - l + 1) * ‖rowDefect P N M (exp (H • A)) (exp (-(H • A))) l‖)) :
-    ∃ x0, x0 ≠ 0 ∧ ∃ k ≤ K, c * ‖x0‖ < ‖x x0 k - (exp (H • A) ^ k) x0‖ := by
-  by_contra hne
-  have hδ : ∀ x0, x0 ≠ 0 → ∀ k ≤ K, ‖x x0 k - (exp (H • A) ^ k) x0‖ ≤ c * ‖x0‖ := by
-    intro x0 hx0 k hk
-    by_contra hlt
-    exact hne ⟨x0, hx0, k, hk, not_le.1 hlt⟩
-  exact absurd (run_order_row A P N M hH hl hK hKH hP hN hM x hx hδ) (not_le.2 hc)
+    ∃ x0, x0 ≠ 0 ∧ ∃ k ≤ K, c * ‖x0‖ < ‖x x0 k - (exp (H • A) ^ k) x0‖ :=
+  exists_relative_error_gt
+    (fun _ hδ => run_order_row A P N M hH hl hK hKH hP hN hM x hx hδ) hc
 
 end Main
 

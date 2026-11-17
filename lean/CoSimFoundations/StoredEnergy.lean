@@ -66,15 +66,6 @@ section Signs
 
 variable {κ : Type*} (S : HeldScheme n κ)
 
-/-- Between two subsystems at the same stage the sign is `-1`: each uses a held sample of the
-other. -/
-theorem sg_of_stage_eq {s k : κ} (h : S.stage s = S.stage k) : S.sg s k = -1 := by
-  have hn : ¬ S.stage k < S.stage s := by
-    rw [h]
-    exact lt_irrefl _
-  unfold sg
-  exact ite_eq_right hn
-
 /-- Between two subsystems at different stages the sign changes with the direction:
 `ς_{ks} = -ς_{sk}`. -/
 theorem sg_swap {s k : κ} (h : S.stage s ≠ S.stage k) : S.sg k s = -S.sg s k := by
@@ -246,6 +237,18 @@ theorem parCoupling_eq_zero
     fun h => hstage p q h.1 h.2
   rw [S.parCoupling_apply, Matrix.zero_apply]
   exact ite_eq_right hn
+
+/-- If no two partners share a stage and `A` has no block between subsystems that are not
+partners, the coupling within a stage vanishes: `A_par = 0`. -/
+theorem parCoupling_eq_zero_of_partner {A : Matrix (Fin n) (Fin n) ℝ}
+    (hA : ∀ p q, S.sub p ≠ S.sub q → ¬ S.partner (S.sub p) (S.sub q) → A p q = 0)
+    (hns : ∀ s t, s ≠ t → S.partner s t → S.stage s ≠ S.stage t) : S.parCoupling A = 0 := by
+  ext p q
+  rw [S.parCoupling_apply, Matrix.zero_apply]
+  by_cases h : S.sub p ≠ S.sub q ∧ S.stage (S.sub p) = S.stage (S.sub q)
+  · rw [ite_eq_left h]
+    exact hA p q h.1 fun hp => hns _ _ h.1 hp h.2
+  · rw [ite_eq_right h]
 
 /-- If different subsystems never share a stage, the signed coupling is its sequential part. -/
 theorem signedCoupling_eq_seqCoupling

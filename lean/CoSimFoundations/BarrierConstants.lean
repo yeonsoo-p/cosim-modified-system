@@ -56,9 +56,26 @@ theorem mul_exp_sub_one_le (x : ℝ) (K : ℕ) :
   rw [add_sub_cancel, ← Real.exp_nat_mul] at h
   linarith
 
+/-- `2 - e^{1/2} > 0.35`: a bound `s ≤ 1 / ((2 - e^{1/2}) K')` gives `s ≤ 1 / (0.35 K')`. -/
+theorem le_one_div_of_le_one_div_exp_half {s K' : ℝ} (hK' : 0 < K')
+    (hs : s ≤ 1 / ((2 - Real.exp (1 / 2)) * K')) : s ≤ 1 / (0.35 * K') := by
+  have he := exp_half_lt
+  refine hs.trans (one_div_le_one_div_of_le (by positivity) ?_)
+  exact mul_le_mul_of_nonneg_right (by linarith) hK'.le
+
 section Algebra
 
 variable {𝔸 : Type*} [NormedRing 𝔸] [NormedAlgebra ℝ 𝔸] [CompleteSpace 𝔸]
+
+/-- `exp x * exp (-x) = 1`. -/
+theorem exp_mul_exp_neg (x : 𝔸) : exp x * exp (-x) = 1 := by
+  let _ : NormedAlgebra ℚ 𝔸 := NormedAlgebra.restrictScalars ℚ ℝ 𝔸
+  rw [← exp_add_of_commute (Commute.refl x).neg_right, add_neg_cancel, exp_zero]
+
+/-- `exp (-x) * exp x = 1`. -/
+theorem exp_neg_mul_exp (x : 𝔸) : exp (-x) * exp x = 1 := by
+  have h := exp_mul_exp_neg (-x)
+  rwa [neg_neg] at h
 
 /-- **The exponential near one:** `‖exp Z - 1‖ ≤ exp ‖Z‖ - 1`. -/
 theorem norm_exp_sub_one_le_exp_norm (Z : 𝔸) : ‖exp Z - 1‖ ≤ Real.exp ‖Z‖ - 1 := by
@@ -67,9 +84,8 @@ theorem norm_exp_sub_one_le_exp_norm (Z : 𝔸) : ‖exp Z - 1‖ ≤ Real.exp �
   have htail := (hasSum_nat_add_iff' 1).2 hf
   rw [Finset.sum_range_one, pow_zero, Nat.factorial_zero, Nat.cast_one, inv_one, one_smul]
     at htail
-  have h : HasSum (fun n : ℕ => ‖Z‖ ^ n / (n ! : ℝ)) (Real.exp ‖Z‖) := by
-    rw [Real.exp_eq_exp_ℝ]
-    exact expSeries_div_hasSum_exp ‖Z‖
+  have h : HasSum (fun n : ℕ => ‖Z‖ ^ n / (n ! : ℝ)) (Real.exp ‖Z‖) :=
+    Real.exp_eq_exp_ℝ ▸ expSeries_div_hasSum_exp ‖Z‖
   have hg := (hasSum_nat_add_iff' 1).2 h
   rw [Finset.sum_range_one, pow_zero, Nat.factorial_zero, Nat.cast_one, div_one] at hg
   refine htail.norm_le_of_bounded hg (fun i => ?_)
@@ -89,7 +105,73 @@ theorem norm_exp_smul_pow_sub_one_le (A : 𝔸) {H : ℝ} (hH : 0 ≤ H) (k : �
     rw [norm_smul, Real.norm_of_nonneg hH]
   exact sub_le_sub_right (Real.exp_le_exp.2 h) 1
 
+/-- Within a horizon `K H ‖A‖ ≤ 1/2` every power `U ^ k`, `k ≤ K`, of the reference step is
+within `β = exp (1/2) - 1` of one. -/
+theorem norm_exp_smul_pow_sub_one_le_half (A : 𝔸) {H : ℝ} (hH : 0 ≤ H) {K : ℕ}
+    (hKH : K * H * ‖A‖ ≤ 1 / 2) {k : ℕ} (hk : k ≤ K) :
+    ‖exp (H • A) ^ k - 1‖ ≤ Real.exp (1 / 2) - 1 := by
+  have hkK : (k : ℝ) ≤ K := by exact_mod_cast hk
+  have h1 : (k : ℝ) * (H * ‖A‖) ≤ 1 / 2 :=
+    (mul_le_mul_of_nonneg_right hkK (mul_nonneg hH (norm_nonneg A))).trans
+      (by rw [← mul_assoc]; exact hKH)
+  exact (norm_exp_smul_pow_sub_one_le A hH k).trans
+    (sub_le_sub_right (Real.exp_le_exp.2 h1) 1)
+
+/-- **Step (c):** within a horizon `K H ‖A‖ ≤ 1/2`, `K' ‖U - 1‖ ≤ exp (1/2) - 1` for every
+`0 ≤ K' ≤ K`, because `K (exp x - 1) ≤ exp (K x) - 1`. -/
+theorem mul_norm_exp_smul_sub_one_le (A : 𝔸) {H : ℝ} (hH : 0 ≤ H) {K : ℕ}
+    (hKH : K * H * ‖A‖ ≤ 1 / 2) {K' : ℝ} (hK'0 : 0 ≤ K') (hK' : K' ≤ K) :
+    K' * ‖exp (H • A) - 1‖ ≤ Real.exp (1 / 2) - 1 := by
+  have h1 : ‖exp (H • A) - 1‖ ≤ Real.exp (H * ‖A‖) - 1 := by
+    refine (norm_exp_sub_one_le_exp_norm _).trans (le_of_eq ?_)
+    rw [norm_smul, Real.norm_of_nonneg hH]
+  have h2 : 0 ≤ Real.exp (H * ‖A‖) - 1 := (norm_nonneg _).trans h1
+  have h3 := mul_exp_sub_one_le (H * ‖A‖) K
+  have h4 : Real.exp (K * (H * ‖A‖)) ≤ Real.exp (1 / 2) :=
+    Real.exp_le_exp.2 (by rw [← mul_assoc]; exact hKH)
+  calc K' * ‖exp (H • A) - 1‖
+      ≤ K' * (Real.exp (H * ‖A‖) - 1) := mul_le_mul_of_nonneg_left h1 hK'0
+    _ ≤ K * (Real.exp (H * ‖A‖) - 1) := mul_le_mul_of_nonneg_right hK' h2
+    _ ≤ Real.exp (1 / 2) - 1 := by linarith
+
 variable [NormOneClass 𝔸]
+
+/-- **Step (b), for any finite sum:** a sum of `n ≥ 1` elements that are each within
+`β = exp (1/2) - 1` of one has a right inverse of norm at most `1 / ((2 - exp (1/2)) n)`: the
+mean is within `β < 1` of one and has an inverse `T'` with `‖T'‖ ≤ 1 / (1 - β)` (Neumann
+series), and `T' / n` is a right inverse of the sum. -/
+theorem exists_sum_right_inverse {ι : Type*} {s : Finset ι} (hs : s.Nonempty) (u : ι → 𝔸)
+    (hu : ∀ k ∈ s, ‖u k - 1‖ ≤ Real.exp (1 / 2) - 1) :
+    ∃ S' : 𝔸, (∑ k ∈ s, u k) * S' = 1 ∧
+      ‖S'‖ ≤ 1 / ((2 - Real.exp (1 / 2)) * (s.card : ℝ)) := by
+  have hKpos : (0 : ℝ) < s.card := by exact_mod_cast hs.card_pos
+  have he := exp_half_lt
+  -- the sum is within `n β` of `n`
+  have hS : ‖(∑ k ∈ s, u k) - (s.card : ℝ) • (1 : 𝔸)‖ ≤ s.card * (Real.exp (1 / 2) - 1) := by
+    have e : (∑ k ∈ s, u k) - (s.card : ℝ) • (1 : 𝔸) = ∑ k ∈ s, (u k - 1) := by
+      rw [Finset.sum_sub_distrib, Finset.sum_const, Nat.cast_smul_eq_nsmul]
+    rw [e]
+    calc ‖∑ k ∈ s, (u k - 1)‖
+        ≤ ∑ _k ∈ s, (Real.exp (1 / 2) - 1) := norm_sum_le_of_le _ hu
+      _ = s.card * (Real.exp (1 / 2) - 1) := by rw [Finset.sum_const, nsmul_eq_mul]
+  -- the mean `T` is within `β` of one
+  have hT : ‖(s.card : ℝ)⁻¹ • (∑ k ∈ s, u k) - 1‖ ≤ Real.exp (1 / 2) - 1 := by
+    have e : (s.card : ℝ)⁻¹ • (∑ k ∈ s, u k) - 1 =
+        (s.card : ℝ)⁻¹ • ((∑ k ∈ s, u k) - (s.card : ℝ) • (1 : 𝔸)) := by
+      rw [smul_sub, inv_smul_smul₀ hKpos.ne']
+    rw [e, norm_smul, norm_inv, Real.norm_of_nonneg hKpos.le, inv_mul_le_iff₀ hKpos]
+    exact hS
+  have hT1 : ‖(s.card : ℝ)⁻¹ • (∑ k ∈ s, u k) - 1‖ < 1 := by linarith
+  obtain ⟨T', hTT', -⟩ := exists_inverse_of_norm_sub_one_lt hT1
+  have hT' := norm_le_of_mul_eq_one hTT' hT1
+  have hpos : 0 < 2 - Real.exp (1 / 2) := by linarith
+  refine ⟨(s.card : ℝ)⁻¹ • T', ?_, ?_⟩
+  · rw [mul_smul_comm, ← smul_mul_assoc]
+    exact hTT'
+  · rw [norm_smul, norm_inv, Real.norm_of_nonneg hKpos.le, one_div, mul_inv, mul_comm]
+    refine mul_le_mul_of_nonneg_right (hT'.trans ?_) (inv_nonneg.2 hKpos.le)
+    rw [one_div]
+    exact inv_anti₀ hpos (by linarith)
 
 /-- **Step (b):** over a horizon `K H ‖A‖ ≤ 1/2` the sum `S_K = Σ_{k < K} U ^ k` of the powers of
 the reference step has a right inverse of norm at most `1 / ((2 - exp (1/2)) K)`. -/
@@ -97,47 +179,10 @@ theorem exists_sum_pow_right_inverse (A : 𝔸) {H : ℝ} (hH : 0 ≤ H) {K : �
     (hKH : K * H * ‖A‖ ≤ 1 / 2) :
     ∃ S' : 𝔸, (∑ k ∈ Finset.range K, exp (H • A) ^ k) * S' = 1 ∧
       ‖S'‖ ≤ 1 / ((2 - Real.exp (1 / 2)) * K) := by
-  have hKpos : (0 : ℝ) < K := by exact_mod_cast hK
-  have hx : 0 ≤ H * ‖A‖ := mul_nonneg hH (norm_nonneg A)
-  have he := exp_half_lt
-  -- every power is within `β = exp (1/2) - 1` of one
-  have hk : ∀ k ∈ Finset.range K, ‖exp (H • A) ^ k - 1‖ ≤ Real.exp (1 / 2) - 1 := by
-    intro k hk
-    have hkK : (k : ℝ) ≤ K := by exact_mod_cast (Finset.mem_range.1 hk).le
-    have h1 : (k : ℝ) * (H * ‖A‖) ≤ 1 / 2 :=
-      (mul_le_mul_of_nonneg_right hkK hx).trans (by rw [← mul_assoc]; exact hKH)
-    exact (norm_exp_smul_pow_sub_one_le A hH k).trans
-      (sub_le_sub_right (Real.exp_le_exp.2 h1) 1)
-  -- the sum is within `K β` of `K`
-  have hS : ‖(∑ k ∈ Finset.range K, exp (H • A) ^ k) - (K : ℝ) • (1 : 𝔸)‖ ≤
-      K * (Real.exp (1 / 2) - 1) := by
-    have e : (∑ k ∈ Finset.range K, exp (H • A) ^ k) - (K : ℝ) • (1 : 𝔸) =
-        ∑ k ∈ Finset.range K, (exp (H • A) ^ k - 1) := by
-      rw [Finset.sum_sub_distrib, Finset.sum_const, Finset.card_range, Nat.cast_smul_eq_nsmul]
-    rw [e]
-    calc ‖∑ k ∈ Finset.range K, (exp (H • A) ^ k - 1)‖
-        ≤ ∑ _k ∈ Finset.range K, (Real.exp (1 / 2) - 1) := norm_sum_le_of_le _ hk
-      _ = K * (Real.exp (1 / 2) - 1) := by
-          rw [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
-  -- the mean `T = S_K / K` is within `β` of one
-  have hT : ‖(K : ℝ)⁻¹ • (∑ k ∈ Finset.range K, exp (H • A) ^ k) - 1‖ ≤
-      Real.exp (1 / 2) - 1 := by
-    have e : (K : ℝ)⁻¹ • (∑ k ∈ Finset.range K, exp (H • A) ^ k) - 1 =
-        (K : ℝ)⁻¹ • ((∑ k ∈ Finset.range K, exp (H • A) ^ k) - (K : ℝ) • (1 : 𝔸)) := by
-      rw [smul_sub, inv_smul_smul₀ hKpos.ne']
-    rw [e, norm_smul, norm_inv, Real.norm_of_nonneg hKpos.le, inv_mul_le_iff₀ hKpos]
-    exact hS
-  have hT1 : ‖(K : ℝ)⁻¹ • (∑ k ∈ Finset.range K, exp (H • A) ^ k) - 1‖ < 1 := by linarith
-  obtain ⟨T', hTT', -⟩ := exists_inverse_of_norm_sub_one_lt hT1
-  have hT' := norm_le_of_mul_eq_one hTT' hT1
-  have hpos : 0 < 2 - Real.exp (1 / 2) := by linarith
-  refine ⟨(K : ℝ)⁻¹ • T', ?_, ?_⟩
-  · rw [mul_smul_comm, ← smul_mul_assoc]
-    exact hTT'
-  · rw [norm_smul, norm_inv, Real.norm_of_nonneg hKpos.le, one_div, mul_inv, mul_comm]
-    refine mul_le_mul_of_nonneg_right (hT'.trans ?_) (inv_nonneg.2 hKpos.le)
-    rw [one_div]
-    exact inv_anti₀ hpos (by linarith)
+  have h := exists_sum_right_inverse (Finset.nonempty_range_iff.2 (by omega))
+    (fun k => exp (H • A) ^ k)
+    fun k hk => norm_exp_smul_pow_sub_one_le_half A hH hKH (Finset.mem_range.1 hk).le
+  rwa [Finset.card_range] at h
 
 /-- **Theorem 4.7 (first-order barrier), inequality (19).** Let `U = exp (H • A)`, `K ≥ 1` with
 `K H ‖A‖ ≤ 1/2`, and let the one-step map `X` have `‖X - U‖ ≥ c`. If the error stays below `δ`
@@ -161,26 +206,14 @@ theorem first_order_barrier (A X : 𝔸) {H : ℝ} (hH : 0 ≤ H) {K : ℕ} (hK 
   have hrun := norm_step_error_le_of_run X (exp (H • A)) S' hK hδ hS
   -- step (c)
   have hU : ((K : ℝ) - 1) * ‖1 - exp (H • A)‖ ≤ Real.exp (1 / 2) - 1 := by
-    have h1 : ‖1 - exp (H • A)‖ ≤ Real.exp (H * ‖A‖) - 1 := by
-      rw [norm_sub_rev]
-      refine (norm_exp_sub_one_le_exp_norm _).trans (le_of_eq ?_)
-      rw [norm_smul, Real.norm_of_nonneg hH]
-    have h2 : 0 ≤ Real.exp (H * ‖A‖) - 1 := (norm_nonneg _).trans h1
-    have h3 := mul_exp_sub_one_le (H * ‖A‖) K
-    have h4 : Real.exp (K * (H * ‖A‖)) ≤ Real.exp (1 / 2) :=
-      Real.exp_le_exp.2 (by rw [← mul_assoc]; exact hKH)
-    calc ((K : ℝ) - 1) * ‖1 - exp (H • A)‖
-        ≤ ((K : ℝ) - 1) * (Real.exp (H * ‖A‖) - 1) := mul_le_mul_of_nonneg_left h1 hK1
-      _ ≤ K * (Real.exp (H * ‖A‖) - 1) := mul_le_mul_of_nonneg_right (by linarith) h2
-      _ ≤ Real.exp (1 / 2) - 1 := by linarith
+    rw [norm_sub_rev]
+    exact mul_norm_exp_smul_sub_one_le A hH hKH hK1 (by linarith)
   -- step (d)
   have h1 : 1 + ((K : ℝ) - 1) * (‖1 - exp (H • A)‖ + δ) ≤ 1.65 + K * δ := by
     have h : ((K : ℝ) - 1) * δ ≤ K * δ := mul_le_mul_of_nonneg_right (by linarith) hδ0
     rw [mul_add]
     linarith
-  have hS'' : ‖S'‖ ≤ 1 / (0.35 * K) := by
-    refine hS'.trans (one_div_le_one_div_of_le (by positivity) ?_)
-    exact mul_le_mul_of_nonneg_right (by linarith) hKpos.le
+  have hS'' : ‖S'‖ ≤ 1 / (0.35 * K) := le_one_div_of_le_one_div_exp_half hKpos hS'
   have h2 : c ≤ δ * (1.65 + K * δ) * (1 / (0.35 * K)) :=
     hc.trans (hrun.trans (mul_le_mul (mul_le_mul_of_nonneg_left h1 hδ0) hS'' (norm_nonneg _)
       (mul_nonneg hδ0 (by positivity))))

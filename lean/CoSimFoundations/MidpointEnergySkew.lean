@@ -24,8 +24,7 @@ as operators `opE`, as in `MidpointEnergy`).
   `-x̄ᵀ R x̄`; `energy_balance_skew_diss` is the form with `R = -sym A` (`inner_opE_sym`: a
   quadratic form sees the symmetric part only).
 * The reduction: if `Ψᵀ = Ψ`, `sym Ψ = Ψ`, `skw Ψ = 0`, `symQ = storedQ`
-  (`symQ_eq_storedQ`), and `energy_balance_of_skew` is `MidpointEnergy.energy_balance`, proved
-  from `energy_balance_skew`.
+  (`symQ_eq_storedQ`), and the balance `energy_balance_skew` is `MidpointEnergy.energy_balance`.
 * `psi_transpose_of_symm`: `Ψᵀ = Ψ` if `A₀ᵀ = A₀` (`φ₁(H A₀)` is then symmetric). With
   `psi_transpose_of_skew` of `MidpointEnergy`: the last term of the balance vanishes if `A₀` is
   symmetric, and if `A₀` is skew.
@@ -90,10 +89,7 @@ theorem opE_zero : opE (0 : Matrix (Fin n) (Fin n) ℝ) = 0 := map_zero _
 /-- A quadratic form sees the symmetric part only: `yᵀ (sym A) y = yᵀ A y`. -/
 theorem inner_opE_sym (A : Matrix (Fin n) (Fin n) ℝ) (y : EuclideanSpace ℝ (Fin n)) :
     ⟪y, opE (sym A) y⟫ = ⟪y, opE A y⟫ := by
-  have h := OneStep.inner_opE_transpose A y y
-  simp only [sym, opE_smul, opE_add, _root_.smul_apply, _root_.add_apply, real_inner_smul_right,
-    inner_add_right]
-  linarith
+  rw [inner_opE_eq_dotProduct, inner_opE_eq_dotProduct, dotProduct_mulVec_sym]
 
 section General
 
@@ -113,29 +109,12 @@ theorem energy_balance_skew_of_rel
       H * ⟪(1 / 2 : ℝ) • (opE X x + x), opE A ((1 / 2 : ℝ) • (opE X x + x))⟫ +
         H / 2 * ⟪opE Apar ((1 / 2 : ℝ) • (opE X x + x)), opE X x - x⟫ -
         ⟪(1 / 2 : ℝ) • (opE X x + x), opE K (opE X x - x)⟫ := by
-  have hv : opE Q (opE X x - x) + opE K (opE X x - x) + (H / 2) • opE Apar (opE X x - x) =
-      (H / 2) • opE A (opE X x + x) := by
-    have h := congrArg (fun M => opE M x) hmid
-    simpa only [opE_mul_apply, opE_add, opE_sub, opE_smul, opE_one, _root_.add_apply,
-      _root_.sub_apply, _root_.smul_apply, one_apply_eq_self] using h
-  have hsym : ⟪x, opE Q (opE X x)⟫ = ⟪opE X x, opE Q x⟫ := by
-    rw [OneStep.inner_opE_transpose Q (opE X x) x, hQ]
-  have hp : ⟪opE X x + x, opE Apar (opE X x - x)⟫ =
-      -⟪opE Apar (opE X x + x), opE X x - x⟫ := by
-    rw [OneStep.inner_opE_transpose Apar (opE X x - x) (opE X x + x), hpar, opE_neg,
-      _root_.neg_apply, inner_neg_right, real_inner_comm]
-  have hQd : ⟪opE X x + x, opE Q (opE X x - x)⟫ =
-      ⟪opE X x, opE Q (opE X x)⟫ - ⟪x, opE Q x⟫ := by
-    rw [map_sub, inner_sub_right, inner_add_left, inner_add_left, hsym]
-    ring
-  have h1 : ⟪opE X x + x, opE Q (opE X x - x)⟫ + ⟪opE X x + x, opE K (opE X x - x)⟫ +
-      H / 2 * ⟪opE X x + x, opE Apar (opE X x - x)⟫ =
-      H / 2 * ⟪opE X x + x, opE A (opE X x + x)⟫ := by
-    have h := congrArg (fun v => ⟪opE X x + x, v⟫) hv
-    simpa only [inner_add_right, real_inner_smul_right] using h
-  rw [hQd, hp] at h1
-  simp only [map_smul, real_inner_smul_left, real_inner_smul_right]
-  linear_combination (1 / 2 : ℝ) * h1
+  rw [add_assoc] at hmid
+  have h := energy_balance_rem_of_rel hmid hQ x
+  simp only [opE_add, opE_smul, _root_.add_apply, _root_.smul_apply, inner_add_right,
+    real_inner_smul_right] at h
+  rw [inner_opE_of_skew hpar] at h
+  linear_combination h
 
 /-- **The exact balance of one step from the midpoint relation, for any `Ψ`** (eq. `eq:balance`).
 If `(Ψ - (H/2) A_seq + (H/2) A_par) (X - 1) = (H/2) A (X + 1)`, `A_seqᵀ = A_seq` and
@@ -208,23 +187,6 @@ theorem energy_balance_skew_diss {R : Matrix (Fin n) (Fin n) ℝ} (hφ : φi * �
         ⟪(1 / 2 : ℝ) • (opE X x + x), opE (skw (psi φi A0 H)) (opE X x - x)⟫ := by
   rw [hR, opE_neg, _root_.neg_apply, inner_neg_right, mul_neg, neg_neg, inner_opE_sym]
   exact energy_balance_skew hφ hX hA hsplit hseq hpar x
-
-/-- **The reduction to a symmetric `Ψ`.** If `Ψᵀ = Ψ`, the balance `energy_balance_skew` is the
-balance `MidpointEnergy.energy_balance` (same statement, proved here from the general one):
-`½ (x'ᵀ Q x' - xᵀ Q x) = H x̄ᵀ A x̄ + (H/2) (A_par x̄)ᵀ (x' - x)` with `Q = Ψ - (H/2) A_seq`. -/
-theorem energy_balance_of_skew (hφ : φi * φ = 1)
-    (hX : X - 1 = H • (φ * (A0 + Aold + Anew * X)))
-    (hA : A0 + Aold + Anew = A) (hsplit : Anew - Aold = Aseq - Apar)
-    (hΨ : (psi φi A0 H)ᵀ = psi φi A0 H) (hseq : Aseqᵀ = Aseq) (hpar : Aparᵀ = -Apar)
-    (x : EuclideanSpace ℝ (Fin n)) :
-    1 / 2 * (⟪opE X x, opE (storedQ φi A0 Aseq H) (opE X x)⟫ -
-        ⟪x, opE (storedQ φi A0 Aseq H) x⟫) =
-      H * ⟪(1 / 2 : ℝ) • (opE X x + x), opE A ((1 / 2 : ℝ) • (opE X x + x))⟫ +
-        H / 2 * ⟪opE Apar ((1 / 2 : ℝ) • (opE X x + x)), opE X x - x⟫ := by
-  have h := energy_balance_skew hφ hX hA hsplit hseq hpar x
-  rw [symQ_eq_storedQ hΨ, skw_eq_zero hΨ, opE_zero, _root_.zero_apply, inner_zero_right,
-    sub_zero] at h
-  exact h
 
 /-! ### When the last term vanishes -/
 
@@ -312,20 +274,6 @@ theorem zoh_energy_balance_skew_diss (hφ : IsUnit (phiOne (H • S.blockDiag A)
   energy_balance_skew_diss (Matrix.nonsing_inv_mul _ hφ) (zoh_implicit S hF hMN)
     (blockDiag_add_oldPart_add_newPart S A) (newPart_sub_oldPart_eq S A)
     (S.seqCoupling_transpose hskew) (S.parCoupling_transpose hskew) rfl x
-
-/-- **The balance `zoh_energy_balance_skew` reduces to `zoh_energy_balance` for a symmetric
-`Ψ`:** the statement of `MidpointEnergy.zoh_energy_balance`, proved from the general balance. -/
-theorem zoh_energy_balance_of_skew (hφ : IsUnit (phiOne (H • S.blockDiag A)).det)
-    (hF : S.F = NormedSpace.exp (H • S.blockDiag A)) (hMN : S.M + S.N = S.zohCoupling A H)
-    (hskew : ∀ p q, S.sub p ≠ S.sub q → A q p = -A p q)
-    (hΨ : (zohPsi S A H)ᵀ = zohPsi S A H) (x : EuclideanSpace ℝ (Fin n)) :
-    1 / 2 * (⟪opE S.X x, opE (zohQ S A H) (opE S.X x)⟫ - ⟪x, opE (zohQ S A H) x⟫) =
-      H * ⟪(1 / 2 : ℝ) • (opE S.X x + x), opE A ((1 / 2 : ℝ) • (opE S.X x + x))⟫ +
-        H / 2 * ⟪opE (S.parCoupling A) ((1 / 2 : ℝ) • (opE S.X x + x)), opE S.X x - x⟫ := by
-  have h := zoh_energy_balance_skew S hφ hF hMN hskew x
-  rw [zohQSym_eq_zohQ S hΨ, skw_eq_zero hΨ, opE_zero, _root_.zero_apply, inner_zero_right,
-    sub_zero] at h
-  exact h
 
 /-- **Eq. `eq:balance` for the zero-order hold `S.zoh A hA H`**, in any order of execution: for
 a lossless coupling and `φ₁(H A₀)` invertible, for every `x`, with `x' = X x`, `x̄ = ½ (x' + x)`,

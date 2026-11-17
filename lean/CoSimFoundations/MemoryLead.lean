@@ -169,12 +169,7 @@ theorem adamsGamma_mul {l : ℕ} (hl : 1 ≤ l) (h : ℝ) :
   have hsum : ∑ m ∈ Ico 1 l, adamsCoeff l m * (m ! : ℝ) / (l ! : ℝ) * (h / ((m + 1)! : ℝ)) =
       (l ! : ℝ)⁻¹ * h * ∑ m ∈ Ico 1 l, adamsCoeff l m / ((m : ℝ) + 1) := by
     rw [mul_sum]
-    refine sum_congr rfl fun m _ => ?_
-    have hm : (m ! : ℝ) ≠ 0 := by positivity
-    have hm1 : (m : ℝ) + 1 ≠ 0 := by positivity
-    rw [Nat.factorial_succ]
-    push_cast
-    field_simp
+    exact sum_congr rfl fun m _ => mul_factorial_div_mul_div _ h l m
   have hl1 : (l : ℝ) + 1 ≠ 0 := by positivity
   unfold adamsGamma
   rw [hsum, sum_range_succ_split _ hl, adamsCoeff_zero hl, adamsCoeff_self, Nat.factorial_succ]
@@ -194,6 +189,44 @@ theorem gamma_identity (g : ℕ → G →L[ℝ] F) (C : E →L[ℝ] G) {l : ℕ}
     (fun m => H ^ (l + 1) / ((m + 1)! : ℝ)) (H ^ l) (fun m => moment g C l m y) z,
     adamsGamma_mul hl, add_smul, moment_top g C hl y, smul_neg]
   abel
+
+/-- **A key step at a lower order, moved to the order `l`.** If on the states `u` not shown up
+to the order `m < l` a moment `μ` satisfies
+`‖H^m μ (A^m u) - H^{m+1}/(m+1)! P A^{m+1} u‖ ≤ D ‖u‖`, then on the states `v` not shown up to
+the order `l`, `‖H^l μ (A^l v) - H^{l+1}/(m+1)! P A^{l+1} v‖ ≤ (H ‖A‖)^{l-m} D ‖v‖`: apply the
+step to `u = A^{l-m} v` and multiply by `H^{l-m}`. -/
+theorem key_step_shift (hA : P ∘L A = Ai ∘L P + L ∘L C) {H : ℝ} (hH : 0 ≤ H) {l m : ℕ}
+    (hml : m < l) (μ : E → F) {D : ℝ} (hD : 0 ≤ D)
+    (hkey : ∀ u, u ∈ unseen P C A m →
+      ‖H ^ m • μ ((A ^ m) u) - (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (m + 1)) u)‖ ≤
+        D * ‖u‖)
+    {v : E} (hv : v ∈ unseen P C A l) :
+    ‖H ^ l • μ ((A ^ l) v) - (H ^ (l + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v)‖ ≤
+      (H * ‖A‖) ^ (l - m) * D * ‖v‖ := by
+  have hv' : (A ^ (l - m)) v ∈ unseen P C A m :=
+    pow_mem_unseen hA (l - m) (by rwa [Nat.add_sub_cancel' hml.le])
+  have h := hkey _ hv'
+  rw [← pow_add_apply', ← pow_add_apply', Nat.add_sub_cancel' hml.le,
+    (by omega : m + 1 + (l - m) = l + 1)] at h
+  have he : H ^ l • μ ((A ^ l) v) - (H ^ (l + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v) =
+      H ^ (l - m) • (H ^ m • μ ((A ^ l) v) -
+        (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v)) := by
+    have e1 : H ^ (l - m) * H ^ m = H ^ l := by rw [← pow_add, Nat.sub_add_cancel hml.le]
+    have e2 : H ^ (l - m) * (H ^ (m + 1) / ((m + 1)! : ℝ)) = H ^ (l + 1) / ((m + 1)! : ℝ) := by
+      rw [← mul_div_assoc, ← pow_add, (by omega : l - m + (m + 1) = l + 1)]
+    rw [smul_sub, smul_smul, smul_smul, e1, e2]
+  have hvn : ‖(A ^ (l - m)) v‖ ≤ ‖A‖ ^ (l - m) * ‖v‖ :=
+    ((A ^ (l - m)).le_opNorm v).trans
+      (mul_le_mul_of_nonneg_right (norm_pow_le' A (by omega)) (norm_nonneg v))
+  rw [he, norm_smul, Real.norm_of_nonneg (pow_nonneg hH _)]
+  calc H ^ (l - m) * ‖H ^ m • μ ((A ^ l) v) -
+        (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v)‖
+      ≤ H ^ (l - m) * (D * (‖A‖ ^ (l - m) * ‖v‖)) :=
+        mul_le_mul_of_nonneg_left (h.trans (mul_le_mul_of_nonneg_left hvn hD))
+          (pow_nonneg hH _)
+    _ = (H * ‖A‖) ^ (l - m) * D * ‖v‖ := by
+        rw [mul_pow]
+        ring
 
 end Filtration
 
@@ -237,6 +270,33 @@ theorem exists_proj_exp_apply_eq (hA : P ∘L A = Ai ∘L P + L ∘L C) (hP : �
       _ ≤ 1 * ‖ρ‖ := mul_le_mul_of_nonneg_right hP (norm_nonneg _)
       _ ≤ expTail (m + 2) (H * ‖A‖) * ‖v‖ := by rw [one_mul]; exact h2
 
+/-- The sample of the age `r ∈ ℕ` in the two notations: `U^{-r} = exp (-(r H) • A)`. -/
+theorem exp_neg_smul_pow (A : E →L[ℝ] E) (H : ℝ) (r : ℕ) :
+    exp (-(H • A)) ^ r = exp ((-((r : ℝ) * H)) • A) := by
+  let _ : NormedAlgebra ℚ (E →L[ℝ] E) := NormedAlgebra.restrictScalars ℚ ℝ (E →L[ℝ] E)
+  rw [← exp_nsmul, ← Nat.cast_smul_eq_nsmul ℝ, smul_neg, smul_smul, neg_smul]
+
+/-- The sample of the reference at an age `a ∈ ℝ` (the state `exp (-(a H) • A) v`), for a state
+not shown up to the order `m`: `T C exp (-(a H) • A) v = H^m ((-a)^m/m!) T C A^m v + ρ` with
+`‖ρ‖ ≤ ‖T ∘ C‖ Σ_{p≥m+1} (|a| x)^p/p! ‖v‖`, `x = H ‖A‖`. The remainder depends on `|a|` only. -/
+theorem exists_age_sample_apply_eq (T : G →L[ℝ] F) {H : ℝ} (hH : 0 ≤ H) {m : ℕ} {v : E}
+    (hv : v ∈ unseen P C A m) (a : ℝ) :
+    ∃ ρ : F, T (C (exp ((-(a * H)) • A) v)) =
+        (H ^ m * ((-a) ^ m / (m ! : ℝ))) • T (C ((A ^ m) v)) + ρ ∧
+      ‖ρ‖ ≤ ‖T ∘L C‖ * (expTail (m + 1) (|a| * (H * ‖A‖)) * ‖v‖) := by
+  obtain ⟨ρ, h1, h2⟩ := exists_exp_smul_apply_eq A (-(a * H)) (b := m + 1) (by omega) v
+  rw [abs_neg, abs_mul, abs_of_nonneg hH, mul_assoc] at h2
+  obtain ⟨-, hC⟩ := mem_unseen.1 hv
+  refine ⟨(T ∘L C) ρ, ?_, ?_⟩
+  · change (T ∘L C) (exp ((-(a * H)) • A) v) = _
+    rw [h1, map_add, map_sum, sum_range_succ, sum_eq_zero, zero_add, map_smul,
+      ContinuousLinearMap.comp_apply]
+    · congr 2
+      ring
+    · intro n hn
+      rw [map_smul, ContinuousLinearMap.comp_apply, hC n (mem_range.1 hn), map_zero, smul_zero]
+  · exact ((T ∘L C).le_opNorm ρ).trans (mul_le_mul_of_nonneg_left h2 (norm_nonneg _))
+
 /-- The sample of age `r` of the reference, for a state not shown up to the order `m`:
 `T C U^{-r} v = H^m ((-r)^m/m!) T C A^m v + ρ` with `‖ρ‖ ≤ ‖T ∘ C‖ Σ_{p≥m+1} (r x)^p/p! ‖v‖`. -/
 theorem exists_sample_apply_eq (T : G →L[ℝ] F) {H : ℝ} (hH : 0 ≤ H) {m : ℕ} {v : E}
@@ -244,21 +304,8 @@ theorem exists_sample_apply_eq (T : G →L[ℝ] F) {H : ℝ} (hH : 0 ≤ H) {m :
     ∃ ρ : F, T (C ((exp (-(H • A)) ^ r) v)) =
         (H ^ m * ((-(r : ℝ)) ^ m / (m ! : ℝ))) • T (C ((A ^ m) v)) + ρ ∧
       ‖ρ‖ ≤ ‖T ∘L C‖ * (expTail (m + 1) (r * (H * ‖A‖)) * ‖v‖) := by
-  have hpow : exp (-(H • A)) ^ r = exp ((-(r * H)) • A) := by
-    let _ : NormedAlgebra ℚ (E →L[ℝ] E) := NormedAlgebra.restrictScalars ℚ ℝ (E →L[ℝ] E)
-    rw [← exp_nsmul, ← Nat.cast_smul_eq_nsmul ℝ, smul_neg, smul_smul, neg_smul]
-  obtain ⟨ρ, h1, h2⟩ := exists_exp_smul_apply_eq A (-(r * H)) (b := m + 1) (by omega) v
-  rw [abs_neg, abs_of_nonneg (mul_nonneg (Nat.cast_nonneg r) hH), mul_assoc] at h2
-  obtain ⟨-, hC⟩ := mem_unseen.1 hv
-  refine ⟨(T ∘L C) ρ, ?_, ?_⟩
-  · change (T ∘L C) ((exp (-(H • A)) ^ r) v) = _
-    rw [hpow, h1, map_add, map_sum, sum_range_succ, sum_eq_zero, zero_add, map_smul,
-      ContinuousLinearMap.comp_apply]
-    · congr 2
-      ring
-    · intro n hn
-      rw [map_smul, ContinuousLinearMap.comp_apply, hC n (mem_range.1 hn), map_zero, smul_zero]
-  · exact ((T ∘L C).le_opNorm ρ).trans (mul_le_mul_of_nonneg_left h2 (norm_nonneg _))
+  have h := exists_age_sample_apply_eq T hH hv (r : ℝ)
+  rwa [Nat.abs_cast, ← exp_neg_smul_pow] at h
 
 /-- The local defect of the rule of a subsystem that runs before all of its partners with `l`
 held samples (eq. `eq:localdefect`): `𝒯 = P U - Fi P - Σ_{r<l} g r C U^{-r}`, `U = exp (H • A)`. -/
@@ -276,6 +323,59 @@ theorem memE_nonneg (l m : ℕ) {w H x : ℝ} (hw : 0 ≤ w) (hH : 0 ≤ H) (hx 
   add_nonneg (expTail_nonneg _ hx) (mul_nonneg (mul_nonneg hw hH)
     (sum_nonneg fun r _ => expTail_nonneg _ (mul_nonneg (Nat.cast_nonneg r) hx)))
 
+/-- **Step 1 for samples of any ages** (every `m ≥ 0`). A rule uses the samples of the ages
+`a r ∈ ℝ`, `r ∈ S`, with the coefficients `g r` (the sample of the age `a` is
+`C exp (-(a H) • A)`), and the coefficients of all samples except those of the age `0` are at
+most `w H`. On the states not shown up to the order `m`,
+`‖H^m ν_m A^m v - H^{m+1}/(m+1)! P A^{m+1} v‖ ≤ (‖𝒯‖ + e_m) ‖v‖`, with the moment
+`ν_m y = Σ_{r ∈ S} ((-a r)^m / m!) g r (C y)`, the local defect
+`𝒯 = P U - Fi P - Σ_{r ∈ S} g r C exp (-(a r H) • A)` and the remainder
+`e_m = Σ_{p≥m+2} x^p/p! + w H Σ_{r ∈ S} Σ_{p≥m+1} (|a r| x)^p/p!`, `x = H ‖A‖`. -/
+theorem age_key_step {ι : Type*} (hA : P ∘L A = Ai ∘L P + L ∘L C) (hP : ‖P‖ ≤ 1)
+    (Fi : F →L[ℝ] F) (S : Finset ι) (a : ι → ℝ) (g : ι → G →L[ℝ] F) {H w : ℝ} (hH : 0 ≤ H)
+    (hw : ∀ r ∈ S, a r ≠ 0 → ‖g r ∘L C‖ ≤ w * H) {m : ℕ} {v : E}
+    (hv : v ∈ unseen P C A m) :
+    ‖H ^ m • ∑ r ∈ S, ((-a r) ^ m / (m ! : ℝ)) • g r (C ((A ^ m) v)) -
+        (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (m + 1)) v)‖ ≤
+      (‖P ∘L exp (H • A) - Fi ∘L P - ∑ r ∈ S, (g r ∘L C) ∘L exp ((-(a r * H)) • A)‖ +
+        (expTail (m + 2) (H * ‖A‖) +
+          w * H * ∑ r ∈ S, expTail (m + 1) (|a r| * (H * ‖A‖)))) * ‖v‖ := by
+  obtain ⟨D, hD⟩ : ∃ D : E →L[ℝ] F,
+      D = P ∘L exp (H • A) - Fi ∘L P - ∑ r ∈ S, (g r ∘L C) ∘L exp ((-(a r * H)) • A) :=
+    ⟨_, rfl⟩
+  rw [← hD]
+  obtain ⟨ρ0, h0, hρ0⟩ := exists_proj_exp_apply_eq hA hP hH hv
+  choose ρ h1 hρ using fun r => exists_age_sample_apply_eq (g r) hH hv (a r)
+  obtain ⟨hPv, -⟩ := mem_unseen.1 hv
+  have hT : D v = (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (m + 1)) v) + ρ0 -
+      H ^ m • ∑ r ∈ S, ((-a r) ^ m / (m ! : ℝ)) • g r (C ((A ^ m) v)) - ∑ r ∈ S, ρ r := by
+    rw [hD]
+    simp only [_root_.sub_apply, _root_.sum_apply, ContinuousLinearMap.comp_apply]
+    rw [h0, hPv, map_zero, sub_zero, sum_congr rfl fun r _ => h1 r, sum_add_distrib, smul_sum]
+    simp only [smul_smul]
+    abel
+  have hkey : H ^ m • ∑ r ∈ S, ((-a r) ^ m / (m ! : ℝ)) • g r (C ((A ^ m) v)) -
+      (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (m + 1)) v) = ρ0 - D v - ∑ r ∈ S, ρ r := by
+    rw [hT]
+    abel
+  rw [hkey]
+  have hsum : ‖∑ r ∈ S, ρ r‖ ≤
+      ∑ r ∈ S, w * H * (expTail (m + 1) (|a r| * (H * ‖A‖)) * ‖v‖) := by
+    refine norm_sum_le_of_le _ fun r hr => (hρ r).trans ?_
+    rcases eq_or_ne (a r) 0 with h0 | h0
+    · simp [h0, expTail_zero]
+    · exact mul_le_mul_of_nonneg_right (hw r hr h0)
+        (mul_nonneg (expTail_nonneg _ (by positivity)) (norm_nonneg _))
+  have h5 : ∑ r ∈ S, w * H * (expTail (m + 1) (|a r| * (H * ‖A‖)) * ‖v‖) =
+      w * H * (∑ r ∈ S, expTail (m + 1) (|a r| * (H * ‖A‖))) * ‖v‖ := by
+    rw [mul_sum, sum_mul]
+    exact sum_congr rfl fun r _ => by ring
+  have hTv := D.le_opNorm v
+  have h3 := norm_sub_le (ρ0 - D v) (∑ r ∈ S, ρ r)
+  have h4 := norm_sub_le ρ0 (D v)
+  rw [h5] at hsum
+  linarith
+
 /-- **Step 1 of the proof of Theorem 4.10** (report, inequality (key)): on the states not shown
 up to the order `m`, the `m`-th moment of the coefficients is forced to its Adams value up to
 the local defect: `‖H^m ν_m A^m v - H^{m+1}/(m+1)! P A^{m+1} v‖ ≤ (‖𝒯‖ + e_m) ‖v‖`. -/
@@ -286,40 +386,10 @@ theorem memory_key_step (hA : P ∘L A = Ai ∘L P + L ∘L C) (hP : ‖P‖ ≤
     ‖H ^ m • moment g C l m ((A ^ m) v) -
         (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (m + 1)) v)‖ ≤
       (‖localDefect P Fi g C A H l‖ + memE l m w H (H * ‖A‖)) * ‖v‖ := by
-  obtain ⟨ρ0, h0, hρ0⟩ := exists_proj_exp_apply_eq hA hP hH hv
-  choose ρ h1 hρ using fun r => exists_sample_apply_eq (g r) hH hv r
-  obtain ⟨hPv, -⟩ := mem_unseen.1 hv
-  have hT : localDefect P Fi g C A H l v =
-      (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (m + 1)) v) + ρ0 -
-        H ^ m • moment g C l m ((A ^ m) v) - ∑ r ∈ range l, ρ r := by
-    unfold localDefect moment
-    simp only [_root_.sub_apply, _root_.sum_apply, ContinuousLinearMap.comp_apply]
-    rw [h0, hPv, map_zero, sub_zero, sum_congr rfl fun r _ => h1 r, sum_add_distrib, smul_sum]
-    simp only [smul_smul]
-    abel
-  have hkey : H ^ m • moment g C l m ((A ^ m) v) -
-      (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (m + 1)) v) =
-      ρ0 - localDefect P Fi g C A H l v - ∑ r ∈ range l, ρ r := by
-    rw [hT]
-    abel
-  rw [hkey]
-  have hsum : ‖∑ r ∈ range l, ρ r‖ ≤
-      ∑ r ∈ range l, w * H * (expTail (m + 1) (r * (H * ‖A‖)) * ‖v‖) := by
-    refine norm_sum_le_of_le _ fun r hr => (hρ r).trans ?_
-    rcases Nat.eq_zero_or_pos r with rfl | hr0
-    · simp [expTail_zero]
-    · exact mul_le_mul_of_nonneg_right (hw r hr0 (mem_range.1 hr))
-        (mul_nonneg (expTail_nonneg _ (by positivity)) (norm_nonneg _))
-  have h5 : ∑ r ∈ range l, w * H * (expTail (m + 1) (r * (H * ‖A‖)) * ‖v‖) =
-      w * H * (∑ r ∈ range l, expTail (m + 1) (r * (H * ‖A‖))) * ‖v‖ := by
-    rw [mul_sum, sum_mul]
-    exact sum_congr rfl fun r _ => by ring
-  have hTv := (localDefect P Fi g C A H l).le_opNorm v
-  have h3 := norm_sub_le (ρ0 - localDefect P Fi g C A H l v) (∑ r ∈ range l, ρ r)
-  have h4 := norm_sub_le ρ0 (localDefect P Fi g C A H l v)
-  unfold memE
-  rw [h5] at hsum
-  linarith
+  have h := age_key_step hA hP Fi (range l) (fun r : ℕ => (r : ℝ)) g hH
+    (fun r hr h0 => hw r (Nat.pos_of_ne_zero (Nat.cast_ne_zero.1 h0)) (mem_range.1 hr)) hv
+  simp only [Nat.abs_cast, ← exp_neg_smul_pow] at h
+  exact h
 
 end Taylor
 
@@ -373,9 +443,7 @@ theorem memC2_nonneg (l : ℕ) : 0 ≤ memC2 l :=
 theorem memE_le (l m : ℕ) {w H x : ℝ} (hw : 0 ≤ w) (hH : 0 ≤ H) (hx0 : 0 ≤ x) (hx1 : x ≤ 1) :
     memE l m w H x ≤ expTail (m + 2) 1 * x ^ (m + 2) +
       w * H * (∑ r ∈ range l, expTail (m + 1) r) * x ^ (m + 1) := by
-  have h1 : expTail (m + 2) x ≤ expTail (m + 2) 1 * x ^ (m + 2) := by
-    have h := expTail_mul_le (m + 2) zero_le_one hx0 hx1
-    rwa [one_mul, mul_comm] at h
+  have h1 := expTail_le_mul_pow (m + 2) hx0 hx1
   have h2 : ∑ r ∈ range l, expTail (m + 1) (r * x) ≤
       (∑ r ∈ range l, expTail (m + 1) r) * x ^ (m + 1) := by
     rw [sum_mul]
@@ -398,6 +466,62 @@ theorem mul_opNorm_le_of_forall {V W : Type*} [NormedAddCommGroup V] [NormedSpac
       exact h u
     rw [le_div_iff₀ hc] at h1
     linarith
+
+/-- The remainder `C_1 a^{l+2} + C_2 w a^{l+1}` of `eq:memorylead` is not negative for
+`a, w ≥ 0`. -/
+theorem memRem_nonneg (l : ℕ) {a w : ℝ} (ha : 0 ≤ a) (hw : 0 ≤ w) :
+    0 ≤ memC1 l * a ^ (l + 2) + memC2 l * w * a ^ (l + 1) := by
+  have h1 := memC1_nonneg l
+  have h2 := memC2_nonneg l
+  positivity
+
+/-- **From the bounded form to the leading-order form** (the arithmetic of `eq:memorylead`).
+Let `x = H a ≤ 1`, weights `β_m ≥ 0` of the orders `m ∈ s`, all below `l`, and remainders
+`e_m ≤ ε_m x^{m+2} + w H ς_m x^{m+1}`. Then
+`(1 + Σ_m β_m x^{l-m}) t + e_l + Σ_m β_m x^{l-m} e_m
+  ≤ (1 + b x) t + (C_1 a^{l+2} + C_2 w a^{l+1}) H^{l+2}`
+with `b = Σ_m β_m`, `C_1 = ε_l + Σ_m β_m ε_m` and `C_2 = ς_l + Σ_m β_m ς_m`, sums over `m ∈ s`. -/
+theorem lead_of_bounded_arith (s : Finset ℕ) {l : ℕ} (hs : ∀ m ∈ s, m < l) (β e ε σ : ℕ → ℝ)
+    (hβ : ∀ m, 0 ≤ β m) {H a w t : ℝ} (hx0 : 0 ≤ H * a) (hx1 : H * a ≤ 1) (ht0 : 0 ≤ t)
+    (he : ∀ m, e m ≤ ε m * (H * a) ^ (m + 2) + w * H * σ m * (H * a) ^ (m + 1)) :
+    (1 + ∑ m ∈ s, β m * (H * a) ^ (l - m)) * t + e l +
+        ∑ m ∈ s, β m * (H * a) ^ (l - m) * e m ≤
+      (1 + (∑ m ∈ s, β m) * (H * a)) * t +
+        ((ε l + ∑ m ∈ s, β m * ε m) * a ^ (l + 2) +
+          (σ l + ∑ m ∈ s, β m * σ m) * w * a ^ (l + 1)) * H ^ (l + 2) := by
+  -- (a) the factor of the defect
+  have ha : ∑ m ∈ s, β m * (H * a) ^ (l - m) ≤ (∑ m ∈ s, β m) * (H * a) := by
+    rw [sum_mul]
+    refine sum_le_sum fun m hm => mul_le_mul_of_nonneg_left ?_ (hβ m)
+    have h := pow_le_pow_of_le_one hx0 hx1 (by have := hs m hm; omega : 1 ≤ l - m)
+    rwa [pow_one] at h
+  -- (b) the remainders
+  have hb : ∑ m ∈ s, β m * (H * a) ^ (l - m) * e m ≤
+      ∑ m ∈ s, (β m * ε m * (H * a) ^ (l + 2) + β m * σ m * (w * H * (H * a) ^ (l + 1))) := by
+    refine sum_le_sum fun m hm => ?_
+    have hml := hs m hm
+    have h := mul_le_mul_of_nonneg_left (he m) (mul_nonneg (hβ m) (pow_nonneg hx0 (l - m)))
+    refine h.trans (le_of_eq ?_)
+    have e1 : (H * a) ^ (l - m) * (H * a) ^ (m + 2) = (H * a) ^ (l + 2) := by
+      rw [← pow_add, (by omega : l - m + (m + 2) = l + 2)]
+    have e2 : (H * a) ^ (l - m) * (H * a) ^ (m + 1) = (H * a) ^ (l + 1) := by
+      rw [← pow_add, (by omega : l - m + (m + 1) = l + 1)]
+    rw [← e1, ← e2]
+    ring
+  have hc := he l
+  rw [sum_add_distrib, ← sum_mul, ← sum_mul] at hb
+  have hmul := mul_le_mul_of_nonneg_right ha ht0
+  have e3 : (H * a) ^ (l + 2) = a ^ (l + 2) * H ^ (l + 2) := by rw [mul_pow, mul_comm]
+  have e4 : w * H * (H * a) ^ (l + 1) = w * a ^ (l + 1) * H ^ (l + 2) := by
+    rw [mul_pow]
+    ring
+  rw [e3, e4] at hb
+  rw [e3] at hc
+  have e5 : w * H * σ l * (H * a) ^ (l + 1) = σ l * (w * a ^ (l + 1) * H ^ (l + 2)) := by
+    rw [mul_pow]
+    ring
+  rw [e5] at hc
+  nlinarith [hb, hc, hmul]
 
 end Constants
 
@@ -424,36 +548,10 @@ theorem memory_bounded_apply (hA : P ∘L A = Ai ∘L P + L ∘L C) (hP : ‖P�
   have hkm : ∀ m ∈ Ico 1 l,
       ‖H ^ l • moment g C l m ((A ^ l) v) -
         (H ^ (l + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v)‖ ≤
-      (H * ‖A‖) ^ (l - m) * (‖localDefect P Fi g C A H l‖ + memE l m w H (H * ‖A‖)) * ‖v‖ := by
-    intro m hm
-    obtain ⟨-, hml⟩ := mem_Ico.1 hm
-    have hv' : (A ^ (l - m)) v ∈ unseen P C A m :=
-      pow_mem_unseen hA (l - m) (by rwa [Nat.add_sub_cancel' hml.le])
-    have h := memory_key_step hA hP Fi g hH hw hv'
-    rw [← pow_add_apply', ← pow_add_apply', Nat.add_sub_cancel' hml.le,
-      (by omega : m + 1 + (l - m) = l + 1)] at h
-    have he : H ^ l • moment g C l m ((A ^ l) v) -
-        (H ^ (l + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v) =
-        H ^ (l - m) • (H ^ m • moment g C l m ((A ^ l) v) -
-          (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v)) := by
-      have e1 : H ^ (l - m) * H ^ m = H ^ l := by rw [← pow_add, Nat.sub_add_cancel hml.le]
-      have e2 : H ^ (l - m) * (H ^ (m + 1) / ((m + 1)! : ℝ)) = H ^ (l + 1) / ((m + 1)! : ℝ) := by
-        rw [← mul_div_assoc, ← pow_add, (by omega : l - m + (m + 1) = l + 1)]
-      rw [smul_sub, smul_smul, smul_smul, e1, e2]
-    have hvn : ‖(A ^ (l - m)) v‖ ≤ ‖A‖ ^ (l - m) * ‖v‖ :=
-      ((A ^ (l - m)).le_opNorm v).trans
-        (mul_le_mul_of_nonneg_right (norm_pow_le' A (by omega)) (norm_nonneg v))
-    rw [he, norm_smul, Real.norm_of_nonneg (pow_nonneg hH _)]
-    calc H ^ (l - m) * ‖H ^ m • moment g C l m ((A ^ l) v) -
-          (H ^ (m + 1) / ((m + 1)! : ℝ)) • P ((A ^ (l + 1)) v)‖
-        ≤ H ^ (l - m) * ((‖localDefect P Fi g C A H l‖ + memE l m w H (H * ‖A‖)) *
-            (‖A‖ ^ (l - m) * ‖v‖)) :=
-          mul_le_mul_of_nonneg_left (h.trans (mul_le_mul_of_nonneg_left hvn
-            (add_nonneg ht0 (memE_nonneg l m hw0 hH hx0)))) (pow_nonneg hH _)
-      _ = (H * ‖A‖) ^ (l - m) * (‖localDefect P Fi g C A H l‖ + memE l m w H (H * ‖A‖)) *
-            ‖v‖ := by
-          rw [mul_pow]
-          ring
+      (H * ‖A‖) ^ (l - m) * (‖localDefect P Fi g C A H l‖ + memE l m w H (H * ‖A‖)) * ‖v‖ :=
+    fun m hm => key_step_shift hA hH (mem_Ico.1 hm).2 (moment g C l m)
+      (add_nonneg ht0 (memE_nonneg l m hw0 hH hx0))
+      (fun _ hu => memory_key_step hA hP Fi g hH hw hu) hv
   have hid := gamma_identity g C hl H ((A ^ l) v) (P ((A ^ (l + 1)) v))
   have hsum : ‖∑ m ∈ Ico 1 l, (adamsCoeff l m * (m ! : ℝ) / (l ! : ℝ)) •
       (H ^ l • moment g C l m ((A ^ l) v) -
@@ -513,47 +611,12 @@ theorem memory_lead_apply (hA : P ∘L A = Ai ∘L P + L ∘L C) (hP : ‖P‖ �
       ((1 + memB l * (H * ‖A‖)) * ‖localDefect P Fi g C A H l‖ +
         (memC1 l * ‖A‖ ^ (l + 2) + memC2 l * w * ‖A‖ ^ (l + 1)) * H ^ (l + 2)) * ‖v‖ := by
   have hx0 : 0 ≤ H * ‖A‖ := mul_nonneg hH (norm_nonneg A)
-  have ht0 : 0 ≤ ‖localDefect P Fi g C A H l‖ := norm_nonneg _
   refine (memory_bounded_apply hA hP Fi g hH hw0 hl hw hv).trans
     (mul_le_mul_of_nonneg_right ?_ (norm_nonneg v))
-  -- (a) the factor of the defect
-  have ha : ∑ m ∈ Ico 1 l, memBeta l m * (H * ‖A‖) ^ (l - m) ≤ memB l * (H * ‖A‖) := by
-    unfold memB
-    rw [sum_mul]
-    refine sum_le_sum fun m hm => mul_le_mul_of_nonneg_left ?_ (memBeta_nonneg l m)
-    have h := pow_le_pow_of_le_one hx0 hx1 (by have := (mem_Ico.1 hm).2; omega : 1 ≤ l - m)
-    rwa [pow_one] at h
-  -- (b) the remainders
-  have hb : ∑ m ∈ Ico 1 l, memBeta l m * (H * ‖A‖) ^ (l - m) * memE l m w H (H * ‖A‖) ≤
-      ∑ m ∈ Ico 1 l, (memBeta l m * expTail (m + 2) 1 * (H * ‖A‖) ^ (l + 2) +
-        memBeta l m * (∑ r ∈ range l, expTail (m + 1) r) * (w * H * (H * ‖A‖) ^ (l + 1))) := by
-    refine sum_le_sum fun m hm => ?_
-    have hml := (mem_Ico.1 hm).2
-    have h := mul_le_mul_of_nonneg_left (memE_le l m hw0 hH hx0 hx1)
-      (mul_nonneg (memBeta_nonneg l m) (pow_nonneg hx0 (l - m)))
-    refine h.trans (le_of_eq ?_)
-    have e1 : (H * ‖A‖) ^ (l - m) * (H * ‖A‖) ^ (m + 2) = (H * ‖A‖) ^ (l + 2) := by
-      rw [← pow_add, (by omega : l - m + (m + 2) = l + 2)]
-    have e2 : (H * ‖A‖) ^ (l - m) * (H * ‖A‖) ^ (m + 1) = (H * ‖A‖) ^ (l + 1) := by
-      rw [← pow_add, (by omega : l - m + (m + 1) = l + 1)]
-    rw [← e1, ← e2]
-    ring
-  have hc := memE_le l l hw0 hH hx0 hx1
-  rw [sum_add_distrib, ← sum_mul, ← sum_mul] at hb
-  have hmul := mul_le_mul_of_nonneg_right ha ht0
-  unfold memC1 memC2
-  have e3 : (H * ‖A‖) ^ (l + 2) = ‖A‖ ^ (l + 2) * H ^ (l + 2) := by rw [mul_pow, mul_comm]
-  have e4 : w * H * (H * ‖A‖) ^ (l + 1) = w * ‖A‖ ^ (l + 1) * H ^ (l + 2) := by
-    rw [mul_pow]
-    ring
-  rw [e3, e4] at hb
-  rw [e3] at hc
-  have e5 : w * H * (∑ r ∈ range l, expTail (l + 1) r) * (H * ‖A‖) ^ (l + 1) =
-      (∑ r ∈ range l, expTail (l + 1) r) * (w * ‖A‖ ^ (l + 1) * H ^ (l + 2)) := by
-    rw [mul_pow]
-    ring
-  rw [e5] at hc
-  nlinarith [hb, hc, hmul]
+  exact lead_of_bounded_arith (Ico 1 l) (fun m hm => (mem_Ico.1 hm).2) (memBeta l)
+    (fun m => memE l m w H (H * ‖A‖)) (fun m => expTail (m + 2) 1)
+    (fun m => ∑ r ∈ range l, expTail (m + 1) r) (memBeta_nonneg l) hx0 hx1 (norm_nonneg _)
+    fun m => memE_le l m hw0 hH hx0 hx1
 
 /-- **Theorem 4.10 (one order per held sample), inequality `eq:memorylead`.** Let subsystem `i`
 (projection `P`, `‖P‖ ≤ 1`, driven through its own state and the outputs `C` of its partners:

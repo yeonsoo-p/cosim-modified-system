@@ -294,18 +294,6 @@ theorem signedCoupling_add_restage {st : κ → ℕ} (h : S.Reversed st)
       ring
     · simp [hpq, h1, lt_asymm h1, h1.ne']
 
-/-- If no two partners share a stage and `A` has no block between subsystems that are not
-partners, the coupling within a stage vanishes: `A_par = 0`. -/
-theorem parCoupling_eq_zero_of_partner {A : Matrix (Fin n) (Fin n) ℝ}
-    (hA : ∀ p q, S.sub p ≠ S.sub q → ¬ S.partner (S.sub p) (S.sub q) → A p q = 0)
-    (hns : ∀ s t, s ≠ t → S.partner s t → S.stage s ≠ S.stage t) : S.parCoupling A = 0 := by
-  ext p q
-  rw [S.parCoupling_apply, Matrix.zero_apply]
-  by_cases h : S.sub p ≠ S.sub q ∧ S.stage (S.sub p) = S.stage (S.sub q)
-  · rw [ite_eq_left h]
-    exact hA p q h.1 fun hp => hns _ _ h.1 hp h.2
-  · rw [ite_eq_right h]
-
 /-- **No two partners at the same stage:** the signed couplings of an assignment and of a
 reversed one cancel, `A_ς^a + A_ς^b = 0`. -/
 theorem signedCoupling_add_restage_eq_zero {st : κ → ℕ} (h : S.Reversed st)
@@ -329,17 +317,9 @@ theorem norm_opE_signedCoupling_le [Fintype κ] (A : Matrix (Fin n) (Fin n) ℝ)
     by_cases hq : S.sub q = s
     · rw [ite_eq_left hq.symm, ite_eq_left hq, mul_zero]
     · rw [ite_eq_right fun e'' => hq e''.symm, ite_eq_right hq, mul_comm]
-  have hos : ‖opE (S.osgn s)‖ ≤ 1 := by
-    refine norm_opE_diagonal_le _ zero_le_one fun r => ?_
-    by_cases hr : S.sub r = s
-    · simp [hr]
-    · by_cases hst : S.stage (S.sub r) < S.stage s <;> simp [hr, sg, hst]
   rw [e]
-  refine (abs_inner_opE_le _ x y).trans (mul_le_mul_of_nonneg_right ?_ (by positivity))
-  rw [opE_mul]
-  calc ‖opE A * opE (S.osgn s)‖ ≤ ‖opE A‖ * ‖opE (S.osgn s)‖ := norm_mul_le _ _
-    _ ≤ ‖opE A‖ * 1 := mul_le_mul_of_nonneg_left hos (norm_nonneg _)
-    _ = ‖opE A‖ := mul_one _
+  exact (abs_inner_opE_le _ x y).trans (mul_le_mul_of_nonneg_right
+    (norm_opE_mul_le_of_norm_le_one A (S.norm_opE_osgn_le s)) (by positivity))
 
 /-! ### The zero-order hold in an assignment and then in a reversed one -/
 

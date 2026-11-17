@@ -134,25 +134,12 @@ variable {κ : Type*} [DecidableEq κ] (S : HeldScheme n κ)
 /-- The diagonal block is the block between a subsystem and itself. -/
 theorem cblock_self (s : κ) (T : Matrix (Fin n) (Fin n) ℝ) : S.cblock s s T = S.blk s T := rfl
 
-/-- The signs of the other subsystems form a diagonal matrix of spectral norm at most one. -/
-theorem norm_opE_osgn_le (s : κ) : ‖opE (S.osgn s)‖ ≤ 1 :=
-  norm_opE_diagonal_le _ zero_le_one fun i => by
-    by_cases h1 : S.sub i = s
-    · simp [h1]
-    · by_cases h2 : S.stage (S.sub i) < S.stage s <;> simp [sg, h1, h2]
-
 /-- With `A_sk = -A_ksᵀ` between different subsystems, the rows of `s` of `A osgn_s A` are minus
 the rows of `Aᵀ osgn_s A`: `Σ_k ς_sk A_sk A_ks = -Σ_k ς_sk A_ksᵀ A_ks`. -/
 theorem osgn_skew_apply {A : Matrix (Fin n) (Fin n) ℝ}
     (hskew : ∀ p q, S.sub p ≠ S.sub q → A q p = -A p q) {s : κ} {p : Fin n} (hp : S.sub p = s)
     (q : Fin n) : (A * S.osgn s * A) p q = -(Aᵀ * S.osgn s * A) p q := by
-  have e1 : (A * S.osgn s * A) p q =
-      ∑ r, A p r * (if S.sub r = s then 0 else S.sg s (S.sub r)) * A r q :=
-    mul_diagonal_mul_apply A A _ p q
-  have e2 : (Aᵀ * S.osgn s * A) p q =
-      ∑ r, Aᵀ p r * (if S.sub r = s then 0 else S.sg s (S.sub r)) * A r q :=
-    mul_diagonal_mul_apply Aᵀ A _ p q
-  rw [e1, e2, ← Finset.sum_neg_distrib]
+  rw [S.mul_osgn_mul_apply, S.mul_osgn_mul_apply, ← Finset.sum_neg_distrib]
   refine Finset.sum_congr rfl fun r _ => ?_
   by_cases hr : S.sub r = s
   · rw [ite_eq_left hr]
@@ -172,6 +159,26 @@ theorem norm_opE_blk_transpose_osgn_le (A : Matrix (Fin n) (Fin n) ℝ) (s : κ)
   have h2 := S.norm_opE_blk_le s (Aᵀ * S.osgn s * A)
   have e : ‖opE A‖ * 1 * ‖opE A‖ = ‖opE A‖ ^ 2 := by ring
   linarith
+
+/-- The gain of the paper, `E_s = (H/2) Σ_k ς_sk A_ksᵀ A_ks`, is of the size of `‖A‖²/2 · H`. -/
+theorem norm_opE_own_gain_le (A : Matrix (Fin n) (Fin n) ℝ) (s : κ) {H : ℝ} (hH : 0 ≤ H) :
+    ‖opE ((H / 2) • S.blk s (Aᵀ * S.osgn s * A))‖ ≤ ‖opE A‖ ^ 2 / 2 * H := by
+  rw [opE_smul, norm_smul, Real.norm_of_nonneg (by positivity)]
+  have h1 := mul_le_mul_of_nonneg_left (S.norm_opE_blk_transpose_osgn_le A s)
+    (by positivity : (0 : ℝ) ≤ H / 2)
+  linarith
+
+/-- With `A_sk = -A_ksᵀ` between different subsystems, the gain of the paper
+`E_s = (H/2) Σ_k ς_sk A_ksᵀ A_ks` cancels the reaction on the block `s`:
+`H E_s = -½H² A osgn_s A` there. -/
+theorem own_gain_apply {A : Matrix (Fin n) (Fin n) ℝ}
+    (hskew : ∀ p q, S.sub p ≠ S.sub q → A q p = -A p q) (H : ℝ) {s : κ} {p q : Fin n}
+    (hp : S.sub p = s) (hq : S.sub q = s) :
+    H * ((H / 2) • S.blk s (Aᵀ * S.osgn s * A)) p q =
+      -(H ^ 2 / 2) * (A * S.osgn s * A) p q := by
+  rw [Matrix.smul_apply, smul_eq_mul, S.blk_apply, ite_eq_left hp, ite_eq_left hq,
+    S.osgn_skew_apply hskew hp q]
+  ring
 
 variable {S}
 
@@ -309,16 +316,9 @@ theorem Consistent.own_output_gain_block {A U : Matrix (Fin n) (Fin n) ℝ} {H a
     ‖opE (S.blk s (S.X - U))‖ ≤
       (reactionC a b c ‖opE A‖ H +
         ‖opE (S.blk s A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blk s A)‖) +
-        ownGainConst (‖opE A‖ ^ 2 / 2) ‖opE (S.blk s A)‖ H) * H ^ 3 := by
-  have hH := h.hH
-  refine h.own_output_local_gain hnp ?_ hFs fun p q hp hq => ?_
-  · rw [opE_smul, norm_smul, Real.norm_of_nonneg (by positivity)]
-    have h1 := mul_le_mul_of_nonneg_left (S.norm_opE_blk_transpose_osgn_le A s)
-      (by positivity : (0 : ℝ) ≤ H / 2)
-    linarith
-  · rw [Matrix.smul_apply, smul_eq_mul, S.blk_apply, ite_eq_left hp, ite_eq_left hq,
-      S.osgn_skew_apply hskew hp q]
-    ring
+        ownGainConst (‖opE A‖ ^ 2 / 2) ‖opE (S.blk s A)‖ H) * H ^ 3 :=
+  h.own_output_local_gain hnp (S.norm_opE_own_gain_le A s h.hH) hFs
+    fun _ _ hp hq => S.own_gain_apply hskew H hp hq
 
 /-! ### The realisation by a constant weight on the own output -/
 
@@ -400,16 +400,9 @@ theorem Consistent.own_output_weight_block {A U Φ : Matrix (Fin n) (Fin n) ℝ}
       (reactionC a b c ‖opE A‖ H +
         ‖opE (S.blk s A)‖ ^ 3 / 6 * Real.exp (H * ‖opE (S.blk s A)‖) +
         ‖opE (S.blk s A)‖ / 2 * Real.exp (H * ‖opE (S.blk s A)‖) * (‖opE A‖ ^ 2 / 2)) *
-          H ^ 3 := by
-  have hH := h.hH
-  refine h.own_output_weight_integral hnp ?_ hΦ hFs fun p q hp hq => ?_
-  · rw [opE_smul, norm_smul, Real.norm_of_nonneg (by positivity)]
-    have h1 := mul_le_mul_of_nonneg_left (S.norm_opE_blk_transpose_osgn_le A s)
-      (by positivity : (0 : ℝ) ≤ H / 2)
-    linarith
-  · rw [Matrix.smul_apply, smul_eq_mul, S.blk_apply, ite_eq_left hp, ite_eq_left hq,
-      S.osgn_skew_apply hskew hp q]
-    ring
+          H ^ 3 :=
+  h.own_output_weight_integral hnp (S.norm_opE_own_gain_le A s h.hH) hΦ hFs
+    fun _ _ hp hq => S.own_gain_apply hskew H hp hq
 
 end HeldScheme
 

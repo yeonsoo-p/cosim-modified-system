@@ -234,16 +234,12 @@ theorem abs_numDamping_zoh_add_links_le [Fintype κ] {A : Matrix (Fin n) (Fin n)
     (hσ : Real.sqrt (Fintype.card κ) * (H * ‖opE A‖) ≤ 1 / 6) :
     |numDamping A H (S.zoh A hA H).X + H / 2 * ∑ p, ∑ q, (S.parCoupling A p q) ^ 2| ≤
       (n : ℝ) * zohDampK (Real.sqrt (Fintype.card κ)) ‖opE A‖ * H ^ 2 := by
-  have hAH4 : H * ‖opE A‖ ≤ 1 / 4 := hAH.trans (by norm_num)
+  obtain ⟨hAH4, hbH⟩ := zohConsB_mul_le hAH
   have hc := S.zoh_consistent hA hH.le hAH4 hσ
-  have ht := S.zoh_taylor_constants_le A hH.le hAH4
-  have hbH : zohConsB ‖opE A‖ * H ≤ 1 / 3 := by
-    unfold zohConsB
-    linarith
   have h := hc.abs_numDamping_add_links_le hself hskew (S.zoh_F A hA H) hH hbH hAH4
   refine h.trans (mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_left ?_ (Nat.cast_nonneg n))
     (by positivity))
-  exact (zohCons_constants_le (Real.sqrt_nonneg _) (norm_nonneg _) ht.1 ht.2.1 ht.2.2).2.2
+  exact (S.zoh_constants_le A hH.le hAH4 (Real.sqrt_nonneg _)).2.2
 
 /-- **The zero-order hold in a Jacobi order:** under the hypotheses of
 `abs_numDamping_zoh_add_links_le`, if all stages are equal,

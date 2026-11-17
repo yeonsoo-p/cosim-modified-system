@@ -79,6 +79,37 @@ theorem mulVec_ne_zero {U : Matrix n n ℝ} (hU : IsUnit U.det) {x : n → ℝ} 
   apply hx
   rw [← one_mulVec x, ← nonsing_inv_mul _ hU, ← mulVec_mulVec, h, mulVec_zero]
 
+/-- Every nonzero vector of the energy space is `U x` for some `x ≠ 0`, `U` invertible. -/
+theorem exists_ofVec_mulVec_eq {U : Matrix n n ℝ} (hU : IsUnit U.det) {y : QSpace E}
+    (hy : y ≠ 0) : ∃ x : n → ℝ, x ≠ 0 ∧ ofVec E (U *ᵥ x) = y := by
+  have hUy : U *ᵥ (U⁻¹ *ᵥ toVec E y) = toVec E y := by
+    rw [mulVec_mulVec, mul_nonsing_inv _ hU, one_mulVec]
+  refine ⟨U⁻¹ *ᵥ toVec E y, fun h0 => hy ?_, hUy⟩
+  rw [h0, mulVec_zero] at hUy
+  exact hUy.symm
+
+/-- **The operator norm on the energy space is attained at `U x`** for some `x ≠ 0` with
+`‖U x‖_Q = 1`, `U` invertible. -/
+theorem exists_mulVec_norm_apply_eq_opNorm [Nonempty n] {U : Matrix n n ℝ} (hU : IsUnit U.det)
+    (T : QSpace E →L[ℝ] QSpace E) :
+    ∃ x : n → ℝ, x ≠ 0 ∧ ‖ofVec E (U *ᵥ x)‖ = 1 ∧ ‖T (ofVec E (U *ᵥ x))‖ = ‖T‖ := by
+  obtain ⟨y, hy1, hTy1⟩ := exists_norm_apply_eq_opNorm T
+  obtain ⟨x, hx0, rfl⟩ :=
+    exists_ofVec_mulVec_eq hU (norm_ne_zero_iff.1 (hy1.trans_ne one_ne_zero))
+  exact ⟨x, hx0, hy1, hTy1⟩
+
+/-- The relative energy change of one step in the energy norm:
+`(S(Φx) - S(Ux)) / S(Ux) = (‖Φ U⁻¹ y‖_Q / ‖y‖_Q)² - 1` with `y = U x`, for `x ≠ 0`. -/
+theorem energy_ratio_eq {U : Matrix n n ℝ} (hU : IsUnit U.det) (Φ : Matrix n n ℝ) {x : n → ℝ}
+    (hx : x ≠ 0) :
+    (energy E (Φ *ᵥ x) - energy E (U *ᵥ x)) / energy E (U *ᵥ x) =
+      (‖op (E := E) (Φ * U⁻¹) (ofVec E (U *ᵥ x))‖ / ‖ofVec E (U *ᵥ x)‖) ^ 2 - 1 := by
+  have hTy : ofVec E (Φ *ᵥ x) = op (E := E) (Φ * U⁻¹) (ofVec E (U *ᵥ x)) :=
+    mulVec_eq_stepDefect hU Φ x
+  have hpos : 0 < ‖ofVec E (U *ᵥ x)‖ := norm_pos_iff.2 (mulVec_ne_zero hU hx)
+  rw [energy_eq, energy_eq, hTy, div_pow]
+  field_simp
+
 /-- **Accuracy (Def. 10.1).** `α = ‖Φ U⁻¹ - I‖_Q` is the largest relative one-step state error
 `‖Φx - Ux‖_Q / ‖Ux‖_Q`, and it is attained. -/
 theorem isGreatest_accuracy [Nonempty n] {U : Matrix n n ℝ} (hU : IsUnit U.det)
@@ -90,17 +121,8 @@ theorem isGreatest_accuracy [Nonempty n] {U : Matrix n n ℝ} (hU : IsUnit U.det
     show Φ *ᵥ x - U *ᵥ x = (Φ * U⁻¹ - 1) *ᵥ (U *ᵥ x)
     rw [sub_mulVec, one_mulVec, ← mulVec_eq_stepDefect hU]
   refine ⟨?_, ?_⟩
-  · obtain ⟨y, hy1, hTy1⟩ := exists_norm_apply_eq_opNorm T
-    have hUy : U *ᵥ (U⁻¹ *ᵥ toVec E y) = toVec E y := by
-      rw [mulVec_mulVec, mul_nonsing_inv _ hU, one_mulVec]
-    have hx0 : U⁻¹ *ᵥ toVec E y ≠ 0 := fun h0 => by
-      rw [h0, mulVec_zero] at hUy
-      have : y = 0 := hUy.symm
-      simp [this] at hy1
-    refine ⟨U⁻¹ *ᵥ toVec E y, hx0, ?_⟩
-    rw [hTy, hUy]
-    show ‖T‖ = ‖T y‖ / ‖y‖
-    rw [hTy1, hy1, div_one]
+  · obtain ⟨x, hx0, hx1, hTx⟩ := exists_mulVec_norm_apply_eq_opNorm hU T
+    exact ⟨x, hx0, by rw [hTy, hTx, hx1, div_one]⟩
   · rintro r ⟨x, hx, rfl⟩
     have hpos : 0 < ‖ofVec E (U *ᵥ x)‖ := norm_pos_iff.2 (mulVec_ne_zero hU hx)
     rw [hTy, div_le_iff₀ hpos]
@@ -112,31 +134,14 @@ theorem isGreatest_energyAdded [Nonempty n] {U : Matrix n n ℝ} (hU : IsUnit U.
     (Φ : Matrix n n ℝ) :
     IsGreatest {r | ∃ x ≠ 0, r = (energy E (Φ *ᵥ x) - energy E (U *ᵥ x)) / energy E (U *ᵥ x)}
       (‖op (E := E) (Φ * U⁻¹)‖ ^ 2 - 1) := by
-  set T := op (E := E) (Φ * U⁻¹)
-  have hTy : ∀ x, ofVec E (Φ *ᵥ x) = T (ofVec E (U *ᵥ x)) := fun x =>
-    mulVec_eq_stepDefect hU Φ x
-  have hratio : ∀ x, x ≠ 0 → (energy E (Φ *ᵥ x) - energy E (U *ᵥ x)) / energy E (U *ᵥ x) =
-      (‖T (ofVec E (U *ᵥ x))‖ / ‖ofVec E (U *ᵥ x)‖) ^ 2 - 1 := fun x hx => by
-    have hpos : 0 < ‖ofVec E (U *ᵥ x)‖ := norm_pos_iff.2 (mulVec_ne_zero hU hx)
-    rw [energy_eq, energy_eq, hTy, div_pow]
-    field_simp
+  set T := op (E := E) (Φ * U⁻¹) with hT
   refine ⟨?_, ?_⟩
-  · obtain ⟨y, hy1, hTy1⟩ := exists_norm_apply_eq_opNorm T
-    have hUy : U *ᵥ (U⁻¹ *ᵥ toVec E y) = toVec E y := by
-      rw [mulVec_mulVec, mul_nonsing_inv _ hU, one_mulVec]
-    have hx0 : U⁻¹ *ᵥ toVec E y ≠ 0 := fun h0 => by
-      rw [h0, mulVec_zero] at hUy
-      have : y = 0 := hUy.symm
-      simp [this] at hy1
-    refine ⟨U⁻¹ *ᵥ toVec E y, hx0, ?_⟩
-    rw [hratio _ hx0, hUy]
-    show ‖T‖ ^ 2 - 1 = (‖T y‖ / ‖y‖) ^ 2 - 1
-    rw [hTy1, hy1, div_one]
+  · obtain ⟨x, hx0, hx1, hTx⟩ := exists_mulVec_norm_apply_eq_opNorm hU T
+    exact ⟨x, hx0, by rw [energy_ratio_eq hU Φ hx0, ← hT, hTx, hx1, div_one]⟩
   · rintro r ⟨x, hx, rfl⟩
-    rw [hratio x hx]
-    have hpos : 0 < ‖ofVec E (U *ᵥ x)‖ := norm_pos_iff.2 (mulVec_ne_zero hU hx)
-    have hle : ‖T (ofVec E (U *ᵥ x))‖ / ‖ofVec E (U *ᵥ x)‖ ≤ ‖T‖ := by
-      rw [div_le_iff₀ hpos]; exact T.le_opNorm _
+    rw [energy_ratio_eq hU Φ hx, ← hT]
+    have hle : ‖T (ofVec E (U *ᵥ x))‖ / ‖ofVec E (U *ᵥ x)‖ ≤ ‖T‖ :=
+      div_le_of_le_mul₀ (norm_nonneg _) (norm_nonneg _) (T.le_opNorm _)
     have h0 : 0 ≤ ‖T (ofVec E (U *ᵥ x))‖ / ‖ofVec E (U *ᵥ x)‖ := by positivity
     have := pow_le_pow_left₀ h0 hle 2
     linarith
@@ -149,28 +154,15 @@ theorem exists_isLeast_energyRemoved [Nonempty n] {U : Matrix n n ℝ} (hU : IsU
     ∃ y : QSpace E, ‖y‖ = 1 ∧
       IsLeast {r | ∃ x ≠ 0, r = (energy E (Φ *ᵥ x) - energy E (U *ᵥ x)) / energy E (U *ᵥ x)}
         (‖op (E := E) (Φ * U⁻¹) y‖ ^ 2 - 1) := by
-  set T := op (E := E) (Φ * U⁻¹)
-  have hTy : ∀ x, ofVec E (Φ *ᵥ x) = T (ofVec E (U *ᵥ x)) := fun x =>
-    mulVec_eq_stepDefect hU Φ x
-  have hratio : ∀ x, x ≠ 0 → (energy E (Φ *ᵥ x) - energy E (U *ᵥ x)) / energy E (U *ᵥ x) =
-      (‖T (ofVec E (U *ᵥ x))‖ / ‖ofVec E (U *ᵥ x)‖) ^ 2 - 1 := fun x hx => by
-    have hpos : 0 < ‖ofVec E (U *ᵥ x)‖ := norm_pos_iff.2 (mulVec_ne_zero hU hx)
-    rw [energy_eq, energy_eq, hTy, div_pow]
-    field_simp
+  set T := op (E := E) (Φ * U⁻¹) with hT
   obtain ⟨y, hy1, hmin⟩ := exists_min_norm_apply T
   refine ⟨y, hy1, ?_, ?_⟩
-  · have hUy : U *ᵥ (U⁻¹ *ᵥ toVec E y) = toVec E y := by
-      rw [mulVec_mulVec, mul_nonsing_inv _ hU, one_mulVec]
-    have hx0 : U⁻¹ *ᵥ toVec E y ≠ 0 := fun h0 => by
-      rw [h0, mulVec_zero] at hUy
-      have : y = 0 := hUy.symm
-      simp [this] at hy1
-    refine ⟨U⁻¹ *ᵥ toVec E y, hx0, ?_⟩
-    rw [hratio _ hx0, hUy]
-    show ‖T y‖ ^ 2 - 1 = (‖T y‖ / ‖y‖) ^ 2 - 1
-    rw [hy1, div_one]
+  · obtain ⟨x, hx0, hxy⟩ :=
+      exists_ofVec_mulVec_eq hU (norm_ne_zero_iff.1 (hy1.trans_ne one_ne_zero))
+    refine ⟨x, hx0, ?_⟩
+    rw [energy_ratio_eq hU Φ hx0, hxy, ← hT, hy1, div_one]
   · rintro r ⟨x, hx, rfl⟩
-    rw [hratio x hx]
+    rw [energy_ratio_eq hU Φ hx, ← hT]
     have hpos : 0 < ‖ofVec E (U *ᵥ x)‖ := norm_pos_iff.2 (mulVec_ne_zero hU hx)
     have hle : ‖T y‖ ≤ ‖T (ofVec E (U *ᵥ x))‖ / ‖ofVec E (U *ᵥ x)‖ := by
       rw [le_div_iff₀ hpos]; exact hmin _

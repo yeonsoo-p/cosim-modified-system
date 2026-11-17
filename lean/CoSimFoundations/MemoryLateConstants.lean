@@ -122,15 +122,8 @@ noncomputable def nodeGamma (S : Finset ℤ) : ℝ :=
 theorem nodeGamma_eq_integral (S : Finset ℤ) :
     nodeGamma S = ((S.card ! : ℝ))⁻¹ * ∫ s in (0 : ℝ)..1, ∏ r ∈ S, (s + r) := by
   simp_rw [← sum_nodeCoeff_mul_pow]
-  have hint : ∀ m ∈ range (S.card + 1),
-      IntervalIntegrable (fun s : ℝ => nodeCoeff S m * s ^ m) MeasureTheory.volume 0 1 :=
-    fun m _ => (continuous_const.mul (continuous_pow m)).intervalIntegrable _ _
-  rw [intervalIntegral.integral_finsetSum hint]
-  unfold nodeGamma
-  congr 1
-  refine sum_congr rfl fun m _ => ?_
-  rw [intervalIntegral.integral_const_mul, integral_pow]
-  simp [div_eq_mul_inv]
+  rw [integral_sum_mul_pow]
+  rfl
 
 /-- The constant in terms of the coefficients of the node polynomial, in the form used in the
 proof: `γ h = h/(l+1)! + Σ_{m<l} (nodeCoeff S m · m!/l!) h/(m+1)!`, `l = #S`. -/
@@ -143,12 +136,7 @@ theorem nodeGamma_mul (S : Finset ℤ) (h : ℝ) :
         nodeCoeff S m * (m ! : ℝ) / (S.card ! : ℝ) * (h / ((m + 1)! : ℝ)) =
       (S.card ! : ℝ)⁻¹ * h * ∑ m ∈ range S.card, nodeCoeff S m / ((m : ℝ) + 1) := by
     rw [mul_sum]
-    refine sum_congr rfl fun m _ => ?_
-    have hm : (m ! : ℝ) ≠ 0 := by positivity
-    have hm1 : (m : ℝ) + 1 ≠ 0 := by positivity
-    rw [Nat.factorial_succ]
-    push_cast
-    field_simp
+    exact sum_congr rfl fun m _ => mul_factorial_div_mul_div _ h S.card m
   have hl1 : (S.card : ℝ) + 1 ≠ 0 := by positivity
   unfold nodeGamma
   rw [hsum, sum_range_succ, nodeCoeff_card, Nat.factorial_succ]
@@ -270,27 +258,6 @@ theorem lateGamma_one : lateGamma 1 = -1 / 2 := by
     adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
   norm_num
 
-/-- `γ'_2 = -1/12`. -/
-theorem lateGamma_two : lateGamma 2 = -1 / 12 := by
-  rw [lateGamma_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
-  norm_num
-
-/-- `γ'_3 = -1/24`. -/
-theorem lateGamma_three : lateGamma 3 = -1 / 24 := by
-  rw [lateGamma_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
-  norm_num
-
-/-- `γ'_4 = -19/720`. -/
-theorem lateGamma_four : lateGamma 4 = -19 / 720 := by
-  rw [lateGamma_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
-  norm_num
-
 end NodeSets
 
 section BoundConstants
@@ -355,9 +322,7 @@ theorem nodeE_le (S : Finset ℤ) (m : ℕ) {w H x : ℝ} (hw : 0 ≤ w) (hH : 0
     (hx1 : x ≤ 1) :
     nodeE S m w H x ≤ expTail (m + 2) 1 * x ^ (m + 2) +
       w * H * (∑ r ∈ S, expTail (m + 1) |(r : ℝ)|) * x ^ (m + 1) := by
-  have h1 : expTail (m + 2) x ≤ expTail (m + 2) 1 * x ^ (m + 2) := by
-    have h := expTail_mul_le (m + 2) zero_le_one hx0 hx1
-    rwa [one_mul, mul_comm] at h
+  have h1 := expTail_le_mul_pow (m + 2) hx0 hx1
   have h2 : ∑ r ∈ S, expTail (m + 1) (|(r : ℝ)| * x) ≤
       (∑ r ∈ S, expTail (m + 1) |(r : ℝ)|) * x ^ (m + 1) := by
     rw [sum_mul]
@@ -436,40 +401,42 @@ theorem lateC2_one : lateC2 1 = 2 * Real.exp 1 - 3 := by
   simp [nodeCoeff_lateNodes_zero, adamsCoeff_zero_zero, expTail_two_one, expTail_one_one]
   ring
 
+/-- The constants `γ'_l` and `b'_l` for `l = 2, 3, 4` samples, from the recursion for the
+coefficients of the node polynomial: `γ'_2, γ'_3, γ'_4 = -1/12, -1/24, -19/720` and
+`b'_2, b'_3, b'_4 = 1/2, 1/6, 2/3`. -/
+theorem lateGamma_lateB_two_to_four :
+    (lateGamma 2 = -1 / 12 ∧ lateGamma 3 = -1 / 24 ∧ lateGamma 4 = -19 / 720) ∧
+      lateB 2 = 1 / 2 ∧ lateB 3 = 1 / 6 ∧ lateB 4 = 2 / 3 := by
+  refine ⟨⟨?_, ?_, ?_⟩, ?_, ?_, ?_⟩ <;>
+    (first | rw [lateGamma_eq (by norm_num)] | rw [lateB_eq (by norm_num)]) <;>
+    simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ,
+      adamsCoeff_succ_succ, adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ,
+      Nat.factorial] <;>
+    norm_num
+
+/-- `γ'_2 = -1/12`. -/
+theorem lateGamma_two : lateGamma 2 = -1 / 12 :=
+  lateGamma_lateB_two_to_four.1.1
+
+/-- `γ'_3 = -1/24`. -/
+theorem lateGamma_three : lateGamma 3 = -1 / 24 :=
+  lateGamma_lateB_two_to_four.1.2.1
+
+/-- `γ'_4 = -19/720`. -/
+theorem lateGamma_four : lateGamma 4 = -19 / 720 :=
+  lateGamma_lateB_two_to_four.1.2.2
+
 /-- `b'_2 = 1/2`. -/
-theorem lateB_two : lateB 2 = 1 / 2 := by
-  rw [lateB_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
-
-/-- `C'_1 = 3e/2 - 47/12` for the new and the current sample. -/
-theorem lateC1_two : lateC1 2 = 3 / 2 * Real.exp 1 - 47 / 12 := by
-  rw [lateC1_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial,
-    expTail_three_one, expTail_four_one]
-  ring
-
-/-- `C'_2 = 3e/2 - 7/2` for the new and the current sample. -/
-theorem lateC2_two : lateC2 2 = 3 / 2 * Real.exp 1 - 7 / 2 := by
-  rw [lateC2_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial,
-    expTail_zero, expTail_two_one, expTail_three_one]
-  ring
+theorem lateB_two : lateB 2 = 1 / 2 :=
+  lateGamma_lateB_two_to_four.2.1
 
 /-- `b'_3 = 1/6`. -/
-theorem lateB_three : lateB 3 = 1 / 6 := by
-  rw [lateB_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
+theorem lateB_three : lateB 3 = 1 / 6 :=
+  lateGamma_lateB_two_to_four.2.2.1
 
 /-- `b'_4 = 2/3`. -/
-theorem lateB_four : lateB 4 = 2 / 3 := by
-  rw [lateB_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial]
-  norm_num
+theorem lateB_four : lateB 4 = 2 / 3 :=
+  lateGamma_lateB_two_to_four.2.2.2
 
 /-- `expTail 5 1 = e - 65/24`. -/
 theorem expTail_five_one : expTail 5 1 = Real.exp 1 - 65 / 24 := by
@@ -501,39 +468,55 @@ theorem expTail_five_two : expTail 5 2 = Real.exp 2 - 7 := by
   simp [expTail, sum_range_succ, Nat.factorial]
   norm_num
 
-/-- `C'_1 = 7e/6 - 25/8` for three samples (ages `-1, 0, 1`). -/
-theorem lateC1_three : lateC1 3 = 7 / 6 * Real.exp 1 - 25 / 8 := by
-  rw [lateC1_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial,
-    expTail_three_one, expTail_five_one]
-  ring
+/-- The constants `C'_1` for `l = 2, 3, 4` samples: `3e/2 - 47/12`, `7e/6 - 25/8` and
+`5e/3 - 3241/720`. -/
+theorem lateC1_two_to_four :
+    lateC1 2 = 3 / 2 * Real.exp 1 - 47 / 12 ∧ lateC1 3 = 7 / 6 * Real.exp 1 - 25 / 8 ∧
+      lateC1 4 = 5 / 3 * Real.exp 1 - 3241 / 720 := by
+  refine ⟨?_, ?_, ?_⟩ <;>
+  · rw [lateC1_eq (by norm_num)]
+    simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ,
+      adamsCoeff_succ_succ, adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ,
+      Nat.factorial, expTail_three_one, expTail_four_one, expTail_five_one, expTail_six_one]
+    ring
 
-/-- `C'_2 = 7e/3 - 6` for three samples (ages `-1, 0, 1`). -/
-theorem lateC2_three : lateC2 3 = 7 / 3 * Real.exp 1 - 6 := by
-  rw [lateC2_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial,
-    expTail_zero, expTail_two_one, expTail_four_one]
-  ring
+/-- `C'_1 = 3e/2 - 47/12` for the new and the current sample. -/
+theorem lateC1_two : lateC1 2 = 3 / 2 * Real.exp 1 - 47 / 12 :=
+  lateC1_two_to_four.1
+
+/-- `C'_1 = 7e/6 - 25/8` for three samples (ages `-1, 0, 1`). -/
+theorem lateC1_three : lateC1 3 = 7 / 6 * Real.exp 1 - 25 / 8 :=
+  lateC1_two_to_four.2.1
 
 /-- `C'_1 = 5e/3 - 3241/720` for four samples (ages `-1, 0, 1, 2`). -/
-theorem lateC1_four : lateC1 4 = 5 / 3 * Real.exp 1 - 3241 / 720 := by
-  rw [lateC1_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial,
-    expTail_three_one, expTail_four_one, expTail_five_one, expTail_six_one]
-  ring
+theorem lateC1_four : lateC1 4 = 5 / 3 * Real.exp 1 - 3241 / 720 :=
+  lateC1_two_to_four.2.2
+
+/-- The constants `C'_2` for `l = 2, 3, 4` samples: `3e/2 - 7/2`, `7e/3 - 6` and
+`5e²/3 + 10e/3 - 59/3`. -/
+theorem lateC2_two_to_four :
+    lateC2 2 = 3 / 2 * Real.exp 1 - 7 / 2 ∧ lateC2 3 = 7 / 3 * Real.exp 1 - 6 ∧
+      lateC2 4 = 5 / 3 * Real.exp 2 + 10 / 3 * Real.exp 1 - 59 / 3 := by
+  refine ⟨?_, ?_, ?_⟩ <;>
+  · rw [lateC2_eq (by norm_num)]
+    simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ,
+      adamsCoeff_succ_succ, adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ,
+      Nat.factorial, expTail_zero, expTail_two_one, expTail_three_one, expTail_four_one,
+      expTail_five_one, expTail_two_two, expTail_three_two, expTail_four_two, expTail_five_two]
+    ring
+
+/-- `C'_2 = 3e/2 - 7/2` for the new and the current sample. -/
+theorem lateC2_two : lateC2 2 = 3 / 2 * Real.exp 1 - 7 / 2 :=
+  lateC2_two_to_four.1
+
+/-- `C'_2 = 7e/3 - 6` for three samples (ages `-1, 0, 1`). -/
+theorem lateC2_three : lateC2 3 = 7 / 3 * Real.exp 1 - 6 :=
+  lateC2_two_to_four.2.1
 
 /-- `C'_2 = 5e²/3 + 10e/3 - 59/3` for four samples (ages `-1, 0, 1, 2`). -/
 theorem lateC2_four :
-    lateC2 4 = 5 / 3 * Real.exp 2 + 10 / 3 * Real.exp 1 - 59 / 3 := by
-  rw [lateC2_eq (by norm_num)]
-  simp [sum_range_succ, nodeCoeff_lateNodes_zero, nodeCoeff_lateNodes_succ, adamsCoeff_succ_succ,
-    adamsCoeff_succ_zero, adamsCoeff_zero_zero, adamsCoeff_zero_succ, Nat.factorial,
-    expTail_zero, expTail_two_one, expTail_three_one, expTail_four_one, expTail_five_one,
-    expTail_two_two, expTail_three_two, expTail_four_two, expTail_five_two]
-  ring
+    lateC2 4 = 5 / 3 * Real.exp 2 + 10 / 3 * Real.exp 1 - 59 / 3 :=
+  lateC2_two_to_four.2.2
 
 end BoundConstants
 

@@ -7,7 +7,8 @@ space of any dimension), `ι` and `μ` reals with `-ι |x|² ≤ ⟨x, S x⟩ �
 `ι = -λ_min`, `μ = λ_max`), `e`, `f` orthonormal, `c = ⟨e, S f⟩` and
 `d = ½ (⟨e, S e⟩ + ⟨f, S f⟩)`. Then
   `ι ≥ |c| - d`   and   `μ ≥ |c| + d`,
-and their sum is the spread form `μ + ι ≥ 2 |c|`. The first inequality uses the lower bound
+and their sum is the spread form `μ + ι ≥ 2 |c|` (`two_mul_abs_inner_le_spread`,
+`spread_law_symm` of `SpreadLaw`). The first inequality uses the lower bound
 alone, the second the upper bound alone.
 
 **Proof.** `e + f` and `e - f` have squared length `2`, and
@@ -17,9 +18,9 @@ bound on both `2 d + 2 |c| ≤ 2 μ`.
 **Forms.**
 * `abs_inner_add_inner_add_le_mu`: any linear map, `|⟨e, T f⟩ + ⟨f, T e⟩| + ⟨e, T e⟩ + ⟨f, T f⟩
   ≤ 2 μ` (the companion of `abs_inner_add_inner_le_local` of `SpreadLaw`).
-* `pair_trade_iota`, `pair_trade_mu`, `pair_trade_spread`: self-adjoint linear maps.
-* `pair_trade_iota_matrix`, `pair_trade_mu_matrix`, `pair_trade_spread_matrix`: symmetric
-  matrices and dot products, the form of `spread_law_symm`.
+* `pair_trade_iota`, `pair_trade_mu`: self-adjoint linear maps.
+* `pair_trade_iota_matrix`, `pair_trade_mu_matrix`: symmetric matrices and dot products, the
+  form of `spread_law_symm`.
 * `pair_trade_iota_opE`, `pair_trade_mu_opE`: operators of symmetric matrices on Euclidean
   space, the form of `AmountLead`.
 * `HeldScheme.pair_trade_iota_blocks`, `HeldScheme.pair_trade_mu_blocks`: unit vectors supported
@@ -53,8 +54,7 @@ theorem abs_inner_add_inner_add_le_mu (T : E →ₗ[ℝ] E) {μ : ℝ}
     (hhi : ∀ x : E, ⟪x, T x⟫ ≤ μ * ‖x‖ ^ 2) {e f : E} (he : ‖e‖ = 1) (hf : ‖f‖ = 1)
     (hef : ⟪e, f⟫ = 0) :
     |⟪e, T f⟫ + ⟪f, T e⟫| + ⟪e, T e⟫ + ⟪f, T f⟫ ≤ 2 * μ := by
-  have hp : ‖e + f‖ ^ 2 = 2 := by rw [norm_add_sq_real, he, hf, hef]; norm_num
-  have hm : ‖e - f‖ ^ 2 = 2 := by rw [norm_sub_sq_real, he, hf, hef]; norm_num
+  obtain ⟨hp, hm⟩ := norm_add_sq_of_orthonormal he hf hef
   have up := hhi (e + f)
   have um := hhi (e - f)
   rw [hp, map_add, inner_add_left, inner_add_right, inner_add_right] at up
@@ -84,16 +84,6 @@ theorem pair_trade_mu (T : E →ₗ[ℝ] E) (hT : T.IsSymmetric) {μ : ℝ}
   rw [inner_apply_comm_of_isSymmetric hT e f, ← two_mul, abs_mul, abs_two] at h
   linarith
 
-/-- **The spread form from the two trades:** `2 |⟪e, T f⟫| ≤ μ + ι`, the sum of
-`pair_trade_iota` and `pair_trade_mu`. -/
-theorem pair_trade_spread (T : E →ₗ[ℝ] E) (hT : T.IsSymmetric) {μ ι : ℝ}
-    (hlo : ∀ x : E, -ι * ‖x‖ ^ 2 ≤ ⟪x, T x⟫) (hhi : ∀ x : E, ⟪x, T x⟫ ≤ μ * ‖x‖ ^ 2) {e f : E}
-    (he : ‖e‖ = 1) (hf : ‖f‖ = 1) (hef : ⟪e, f⟫ = 0) :
-    2 * |⟪e, T f⟫| ≤ μ + ι := by
-  have h1 := pair_trade_iota T hT hlo he hf hef
-  have h2 := pair_trade_mu T hT hhi he hf hef
-  linarith
-
 end Operator
 
 variable {n : ℕ}
@@ -107,8 +97,11 @@ theorem pair_trade_iota_matrix (S : Matrix (Fin n) (Fin n) ℝ) (hS : S.IsSymm) 
     (hlo : ∀ x : Fin n → ℝ, -ι * (x ⬝ᵥ x) ≤ x ⬝ᵥ (S *ᵥ x)) {e f : Fin n → ℝ}
     (he : e ⬝ᵥ e = 1) (hf : f ⬝ᵥ f = 1) (hef : e ⬝ᵥ f = 0) :
     |e ⬝ᵥ (S *ᵥ f)| - (e ⬝ᵥ (S *ᵥ e) + f ⬝ᵥ (S *ᵥ f)) / 2 ≤ ι := by
-  have h := spread_law_local_symm S hS hlo he hf hef
-  linarith
+  have h := pair_trade_iota _ (isSymmetric_opE hS) (le_inner_opE_of_le_dotProduct S hlo)
+    (norm_toLp_eq_one_of_dotProduct_self he) (norm_toLp_eq_one_of_dotProduct_self hf)
+    ((inner_eq_dotProduct _ _).trans hef)
+  simp only [ContinuousLinearMap.coe_coe, inner_opE_eq_dotProduct] at h
+  exact h
 
 /-- **The trade for two orthonormal states, damping** (matrices). For a real symmetric matrix
 `S` with `xᵀ S x ≤ μ · xᵀ x` for all `x` and orthonormal `e`, `f`:
@@ -117,25 +110,11 @@ theorem pair_trade_mu_matrix (S : Matrix (Fin n) (Fin n) ℝ) (hS : S.IsSymm) {�
     (hhi : ∀ x : Fin n → ℝ, x ⬝ᵥ (S *ᵥ x) ≤ μ * (x ⬝ᵥ x)) {e f : Fin n → ℝ}
     (he : e ⬝ᵥ e = 1) (hf : f ⬝ᵥ f = 1) (hef : e ⬝ᵥ f = 0) :
     |e ⬝ᵥ (S *ᵥ f)| + (e ⬝ᵥ (S *ᵥ e) + f ⬝ᵥ (S *ᵥ f)) / 2 ≤ μ := by
-  have hfe : f ⬝ᵥ e = 0 := by rw [dotProduct_comm]; exact hef
-  have up := hhi (e + f)
-  have um := hhi (e - f)
-  simp only [mulVec_add, add_dotProduct, dotProduct_add, he, hf, hef, hfe] at up
-  simp only [mulVec_sub, sub_dotProduct, dotProduct_sub, he, hf, hef, hfe] at um
-  rw [dotProduct_mulVec_comm_of_isSymm hS e f] at up um
-  have h : |e ⬝ᵥ (S *ᵥ f)| ≤ μ - (e ⬝ᵥ (S *ᵥ e) + f ⬝ᵥ (S *ᵥ f)) / 2 :=
-    abs_le.2 ⟨by linarith, by linarith⟩
-  linarith
-
-/-- **The spread form from the two trades** (matrices): `2 |eᵀ S f| ≤ μ + ι`. -/
-theorem pair_trade_spread_matrix (S : Matrix (Fin n) (Fin n) ℝ) (hS : S.IsSymm) {μ ι : ℝ}
-    (hlo : ∀ x : Fin n → ℝ, -ι * (x ⬝ᵥ x) ≤ x ⬝ᵥ (S *ᵥ x))
-    (hhi : ∀ x : Fin n → ℝ, x ⬝ᵥ (S *ᵥ x) ≤ μ * (x ⬝ᵥ x)) {e f : Fin n → ℝ}
-    (he : e ⬝ᵥ e = 1) (hf : f ⬝ᵥ f = 1) (hef : e ⬝ᵥ f = 0) :
-    2 * |e ⬝ᵥ (S *ᵥ f)| ≤ μ + ι := by
-  have h1 := pair_trade_iota_matrix S hS hlo he hf hef
-  have h2 := pair_trade_mu_matrix S hS hhi he hf hef
-  linarith
+  have h := pair_trade_mu _ (isSymmetric_opE hS) (inner_opE_le_of_dotProduct_le S hhi)
+    (norm_toLp_eq_one_of_dotProduct_self he) (norm_toLp_eq_one_of_dotProduct_self hf)
+    ((inner_eq_dotProduct _ _).trans hef)
+  simp only [ContinuousLinearMap.coe_coe, inner_opE_eq_dotProduct] at h
+  exact h
 
 /-! ### Operators of symmetric matrices -/
 
@@ -145,13 +124,8 @@ is symmetric and `-ι ‖v‖² ≤ ⟪v, T v⟫` for all `v`, then for orthonor
 theorem pair_trade_iota_opE {T : Matrix (Fin n) (Fin n) ℝ} (hT : T.IsSymm) {ι : ℝ}
     (hlo : ∀ v : EuclideanSpace ℝ (Fin n), -ι * ‖v‖ ^ 2 ≤ ⟪v, opE T v⟫)
     {e f : EuclideanSpace ℝ (Fin n)} (he : ‖e‖ = 1) (hf : ‖f‖ = 1) (hef : ⟪e, f⟫ = 0) :
-    |⟪e, opE T f⟫| - (⟪e, opE T e⟫ + ⟪f, opE T f⟫) / 2 ≤ ι := by
-  have h := abs_inner_add_inner_le_local
-    ((opE T : EuclideanSpace ℝ (Fin n) →L[ℝ] EuclideanSpace ℝ (Fin n)) :
-      EuclideanSpace ℝ (Fin n) →ₗ[ℝ] EuclideanSpace ℝ (Fin n)) hlo he hf hef
-  rw [ContinuousLinearMap.coe_coe, inner_opE_comm_of_isSymm hT e f, ← two_mul, abs_mul,
-    abs_two] at h
-  linarith
+    |⟪e, opE T f⟫| - (⟪e, opE T e⟫ + ⟪f, opE T f⟫) / 2 ≤ ι :=
+  pair_trade_iota _ (isSymmetric_opE hT) hlo he hf hef
 
 /-- **The trade for two orthonormal states, damping** (operators on Euclidean space). If `T` is
 symmetric and `⟪v, T v⟫ ≤ μ ‖v‖²` for all `v`, then for orthonormal `e`, `f`:
@@ -159,13 +133,8 @@ symmetric and `⟪v, T v⟫ ≤ μ ‖v‖²` for all `v`, then for orthonormal 
 theorem pair_trade_mu_opE {T : Matrix (Fin n) (Fin n) ℝ} (hT : T.IsSymm) {μ : ℝ}
     (hhi : ∀ v : EuclideanSpace ℝ (Fin n), ⟪v, opE T v⟫ ≤ μ * ‖v‖ ^ 2)
     {e f : EuclideanSpace ℝ (Fin n)} (he : ‖e‖ = 1) (hf : ‖f‖ = 1) (hef : ⟪e, f⟫ = 0) :
-    |⟪e, opE T f⟫| + (⟪e, opE T e⟫ + ⟪f, opE T f⟫) / 2 ≤ μ := by
-  have h := abs_inner_add_inner_add_le_mu
-    ((opE T : EuclideanSpace ℝ (Fin n) →L[ℝ] EuclideanSpace ℝ (Fin n)) :
-      EuclideanSpace ℝ (Fin n) →ₗ[ℝ] EuclideanSpace ℝ (Fin n)) hhi he hf hef
-  rw [ContinuousLinearMap.coe_coe, inner_opE_comm_of_isSymm hT e f, ← two_mul, abs_mul,
-    abs_two] at h
-  linarith
+    |⟪e, opE T f⟫| + (⟪e, opE T e⟫ + ⟪f, opE T f⟫) / 2 ≤ μ :=
+  pair_trade_mu _ (isSymmetric_opE hT) hhi he hf hef
 
 namespace HeldScheme
 

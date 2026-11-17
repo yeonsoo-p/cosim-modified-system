@@ -154,10 +154,7 @@ theorem barrier_all_arith {lam c4 c3 H Hl a lr Kp i δ : ℝ} (hH : 0 < H) (hH1 
     have h1 : 0 ≤ ε / 2.65 := by positivity
     rw [hu] at h1u
     linarith
-  have hKp0 : 0 ≤ Kp := by
-    by_contra h
-    have := mul_neg_of_neg_of_pos (not_le.1 h) hx
-    linarith
+  have hKp0 := run_length_nonneg_of_le hx hlx hKp
   have han : a * (Kp * (H * Y)) = Kp * (H * a) * Y := by ring
   have hn_lo : 2.65 * (1 - 2 * lr * (H * a)) * Y ≤ 5.3 * a * (Kp * (H * Y)) := by
     have h1 := mul_le_mul_of_nonneg_right hKp hY0.le
@@ -299,11 +296,6 @@ theorem ruleNew_add_sum_ruleOld (σ : J → ℕ) (P : E →L[ℝ] F) (Fi : F →
   · have h' : σ k.1 ≤ (k.2 : ℕ) := by omega
     rw [ite_eq_right h, ite_eq_left h', zero_add, hold k h']
 
-/-- The reference step and its inverse: `exp Z * exp (-Z) = 1`. -/
-private theorem exp_mul_exp_neg_self (Z : E →L[ℝ] E) : exp Z * exp (-Z) = 1 := by
-  let _ : NormedAlgebra ℚ (E →L[ℝ] E) := NormedAlgebra.restrictScalars ℚ ℝ (E →L[ℝ] E)
-  rw [← exp_add_of_commute (Commute.refl Z).neg_right, add_neg_cancel, exp_zero]
-
 /-- **The local defect of the row of a rule is the local defect of the rule:** for the nodes
 `σ_j - q` with `σ_j ≤ 1`, `(P - N) U - Σ_{r<l} M r U^{-r} = P U - Fi P - Σ_{j,q} G (j,q) C j
 U^{σ_j - q}`. -/
@@ -313,7 +305,7 @@ theorem rowDefect_rule (σ : J → ℕ) (hσ : ∀ j, σ j ≤ 1) (hl : 1 ≤ l)
     rowDefect P (ruleNew σ G C) (ruleOld σ P Fi G C) (exp (H • A)) (exp (-(H • A))) l =
       ruleDefect P Fi G C A H fun j => schemeNodes (σ j) l := by
   ext v
-  have hUU := exp_mul_exp_neg_self (H • A)
+  have hUU := exp_mul_exp_neg (H • A)
   have hnew : ∀ k : J × Fin l, (k.2 : ℕ) < σ k.1 →
       (exp (H • A) ^ σ k.1 * exp (-(H • A)) ^ (k.2 : ℕ)) v = exp (H • A) v := by
     intro k h
@@ -476,22 +468,14 @@ theorem order_barrier_all (hA : P ∘L A = Ai ∘L P + ∑ j, L j ∘L C j) (hP 
         orderBarrierRem P A Ai C L σ l ‖R‖ * H ^ (l + 1)) / (5.3 * ‖A‖) ≤ δ := by
   have hA0 : 0 ≤ ‖A‖ := norm_nonneg A
   have hx0 : 0 ≤ H * ‖A‖ := mul_nonneg hH.le hA0
-  have hxpos : 0 < H * ‖A‖ := by
-    by_contra h
-    have h0 : H * ‖A‖ = 0 := le_antisymm (not_lt.1 h) hx0
-    rw [mul_assoc, h0, mul_zero] at hK1
-    norm_num at hK1
-  have hApos : 0 < ‖A‖ := (mul_pos_iff_of_pos_left hH).1 hxpos
+  have hApos : 0 < ‖A‖ := (pos_of_half_lt_horizon hH.le hA0 hK1).2
   have : Nontrivial E := by
     by_contra hne
     rw [not_nontrivial_iff_subsingleton] at hne
     have h0 : A = 0 := Subsingleton.elim _ _
     rw [h0, norm_zero] at hApos
     exact lt_irrefl _ hApos
-  have hδ0 : 0 ≤ δ := by
-    obtain ⟨y, hy⟩ := exists_ne (0 : E)
-    have h := (norm_nonneg _).trans (hδ y hy 0 (Nat.zero_le _))
-    exact nonneg_of_mul_nonneg_left h (norm_pos_iff.2 hy)
+  have hδ0 := relative_error_bound_nonneg hδ
   have hρ : 0 ≤ ‖R‖ := norm_nonneg R
   have hl1 : (1 : ℝ) ≤ l := by exact_mod_cast hl
   have hlam0 : 0 ≤ orderBarrierLead P C L A σ l := restrNorm_nonneg _ _
@@ -519,14 +503,8 @@ theorem order_barrier_all (hA : P ∘L A = Ai ∘L P + ∑ j, L j ∘L C j) (hP 
     have h2 : orderBarrierLead P C L A σ l * H ^ l * (1 - 2 * (l : ℝ) * (H * ‖A‖)) ≤ 0 :=
       mul_nonpos_of_nonneg_of_nonpos (mul_nonneg hlam0 hHl0) (by linarith [not_le.1 h])
     linarith
-  have hx1 : H * ‖A‖ ≤ 1 := by
-    have := mul_le_mul_of_nonneg_right hl1 hx0
-    linarith
-  have hK : l ≤ K := by
-    by_contra h
-    have h1 : (K : ℝ) + 1 ≤ l := by exact_mod_cast not_le.1 h
-    have h2 : ((K : ℝ) + 1) * (H * ‖A‖) ≤ l * (H * ‖A‖) := mul_le_mul_of_nonneg_right h1 hx0
-    linarith
+  have hx1 : H * ‖A‖ ≤ 1 := (le_half_of_two_mul_le hl hx0 hlx).trans (by norm_num)
+  have hK : l ≤ K := le_of_half_lt_horizon hx0 hlx hK1
   have hlK : (l : ℝ) ≤ K := by exact_mod_cast hK
   -- (0) the row of the rule and its local defect
   have hdef := rowDefect_rule σ hσ hl P Fi G C A H
