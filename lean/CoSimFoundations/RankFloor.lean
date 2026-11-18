@@ -4,9 +4,10 @@ The rank floor: one statement behind the floors of all one-sample classes.
 Finite-dimensional real inner product spaces. `D` the defect, `U` the reference step, `X = D ∘ U`
 on the states `E`. A subsystem (or a subsystem together with the samples it is shown) is read out by
 `P : E → F` with `‖P‖ ≤ 1`. A set of test directions is given by `Y : G → E` such that the
-reference maps them isometrically: `Q = U ∘ Y` with `‖Q‖ ≤ 1` (for instance `Y = V (Vᵀ Uᵀ U V)^{-1/2}`
-for a subspace `V` of states the subsystem is not shown). `Z : E → F` is the part of the scheme's
-answer that is known beforehand (zero; or the subsystem's own decay if it has no local gain).
+reference maps them isometrically: `Q = U ∘ Y` with `‖Q‖ ≤ 1` (for instance
+`Y = V (Vᵀ Uᵀ U V)^{-1/2}` for a subspace `V` of states the subsystem is not shown). `Z : E → F` is
+the part of the scheme's answer that is known beforehand (zero; or the subsystem's own decay if it
+has no local gain).
 
 **Rank floor.** If the scheme's answer on the test directions, beyond the known part, has rank at
 most `r` (`rank (P ∘ X ∘ Y - Z ∘ Y) ≤ r`), then

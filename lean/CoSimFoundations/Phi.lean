@@ -5,8 +5,8 @@ The φ-functions and the moment formula:
   ∫₀^τ sᵃ exp((τ - s) Z) ds = a! τ^{a+1} φ_{a+1}(τ Z).
 
 With `Z = H A_K` and `τ = 1` this is the `a`-th term of the paper's
-`M^r = H Σ_a a! φ_{a+1}(H A_K) B_K V^r_[a]`; the sum over `a` with the factors `B_K V^r_[a]` (and the
-rescaling from the step to `[0, 1]`) is not formalized here. Stated in any real Banach algebra.
+`M^r = H Σ_a a! φ_{a+1}(H A_K) B_K V^r_[a]`; the sum over `a` with the factors `B_K V^r_[a]` (and
+the rescaling from the step to `[0, 1]`) is not formalized here. Stated in any real Banach algebra.
 
 The scalar ingredient is the Beta integral for natural exponents:
   ∫₀^τ sᵃ (τ - s)ʲ ds = j! a! τ^{j+a+1} / (j + a + 1)!.

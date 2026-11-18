@@ -23,7 +23,8 @@ namespace CoSimFoundations
 
 variable {𝔸 : Type*} [NormedRing 𝔸] [NormedAlgebra ℝ 𝔸] [CompleteSpace 𝔸]
 
-/-- The derivative of `τ ↦ exp (τ • Ã) * exp (τ • (-A))` is `exp (τ • Ã) * (Ã - A) * exp (τ • (-A))`. -/
+/-- The derivative of `τ ↦ exp (τ • Ã) * exp (τ • (-A))` is
+`exp (τ • Ã) * (Ã - A) * exp (τ • (-A))`. -/
 theorem hasDerivAt_exp_mul_exp_neg (At A : 𝔸) (τ : ℝ) :
     HasDerivAt (fun u : ℝ => exp (u • At) * exp (u • (-A)))
       (exp (τ • At) * (At - A) * exp (τ • (-A))) τ := by

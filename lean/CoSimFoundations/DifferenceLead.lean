@@ -206,8 +206,8 @@ section Matrices
 
 variable {n : ℕ}
 
-/-- **The modified system** `Ã = (1/H) log X` of a one-step map `X` (the paper, Definition `def:mod`),
-with the logarithm series; it is a modified system for `‖X - 1‖ < 1`
+/-- **The modified system** `Ã = (1/H) log X` of a one-step map `X` (the paper, Definition
+`def:mod`), with the logarithm series; it is a modified system for `‖X - 1‖ < 1`
 (`exp_smul_modifiedSystem`). -/
 noncomputable def modifiedSystem (H : ℝ) (X : Matrix (Fin n) (Fin n) ℝ) :
     Matrix (Fin n) (Fin n) ℝ :=
@@ -219,7 +219,8 @@ noncomputable def difference (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ)
     (X : Matrix (Fin n) (Fin n) ℝ) : Matrix (Fin n) (Fin n) ℝ :=
   modifiedSystem H X - A
 
-/-- **The total numerical damping** `ν = tr Δ_R = -tr Δ` (the paper, Definition `def:props` (iii)). -/
+/-- **The total numerical damping** `ν = tr Δ_R = -tr Δ` (the paper, Definition `def:props` (iii)).
+-/
 noncomputable def numDamping (A : Matrix (Fin n) (Fin n) ℝ) (H : ℝ)
     (X : Matrix (Fin n) (Fin n) ℝ) : ℝ :=
   -Matrix.trace (difference A H X)
@@ -304,8 +305,8 @@ theorem norm_opE_log_sub_smul_sub_le {X A : Matrix (Fin n) (Fin n) ℝ} {H b c :
 
 variable {X A U : Matrix (Fin n) (Fin n) ℝ} {H b c : ℝ}
 
-/-- **The a priori passage, one step** (the paper, Theorem `thm:half`, second statement). If `H > 0`,
-`U = exp (H • A)`, `‖X - 1‖ ≤ b H`, `‖X - U‖ ≤ c H²`, `b H ≤ 1/3` and `H ‖A‖ ≤ 1/4`, then
+/-- **The a priori passage, one step** (the paper, Theorem `thm:half`, second statement). If
+`H > 0`, `U = exp (H • A)`, `‖X - 1‖ ≤ b H`, `‖X - U‖ ≤ c H²`, `b H ≤ 1/3` and `H ‖A‖ ≤ 1/4`, then
 `‖H • Δ - (X - U)‖ ≤ K H³` with `K = 3/2 · c · max b (4/3 ‖A‖)`. -/
 theorem norm_opE_smul_difference_sub_le (hH : 0 < H) (hU : U = exp (H • A))
     (hb : ‖opE (X - 1)‖ ≤ b * H) (hc : ‖opE (X - U)‖ ≤ c * H ^ 2) (hbH : b * H ≤ 1 / 3)

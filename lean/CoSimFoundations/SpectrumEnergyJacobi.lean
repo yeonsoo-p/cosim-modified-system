@@ -1,5 +1,6 @@
 /-
-What the laws for every scheme say for a class that moves nothing between two directions: the one-sample Jacobi instance.
+What the laws for every scheme say for a class that moves nothing between two directions: the
+one-sample Jacobi instance.
 
 `D` the defect, `U` the reference step, `X = D ∘ U`; `e₁`, `e₂` orthonormal with
 `⟪e₁, X e₂⟫ = 0 = ⟪e₂, X e₁⟫` (two stores that are not partners; or two directions, each in the

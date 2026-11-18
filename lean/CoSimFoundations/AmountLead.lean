@@ -254,8 +254,8 @@ theorem Consistent.amount_spread (h : S.Consistent A U H a b c)
 
 /-! ### The two special cases of the paper -/
 
-/-- **The amount in a Jacobi scheme, trace form** (the paper, `cor:amount`, second statement). If all
-subsystems run at the same stage, then in the setting of `Consistent.amount_trace`:
+/-- **The amount in a Jacobi scheme, trace form** (the paper, `cor:amount`, second statement). If
+all subsystems run at the same stage, then in the setting of `Consistent.amount_trace`:
 `H |⟪x, A² y⟫| - K H² ≤ tr Δ_R + n ι`, with `⟪x, A² y⟫ = xᵀ [A²]_ij y`. -/
 theorem Consistent.amount_trace_jacobi (h : S.Consistent A U H a b c)
     (hskew : ∀ p q, S.sub p ≠ S.sub q → A q p = -A p q)

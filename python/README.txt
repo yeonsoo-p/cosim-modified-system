@@ -14,7 +14,8 @@ Packages
 --------
 numpy, scipy            all scripts
 matplotlib              the scripts in figures\
-cvxpy                   numbers\optimal_schemes.py only (with the solver Clarabel, which cvxpy installs)
+cvxpy                   numbers\optimal_schemes.py and numbers\least_values.py only (with the solver
+                        Clarabel, which cvxpy installs)
 
 The figures use the font cmr10 that matplotlib ships. Tested with Python 3.14, numpy 2.5, scipy 1.18,
 matplotlib 3.11 and cvxpy 1.9.
@@ -30,12 +31,13 @@ With uv (https://docs.astral.sh/uv/), from the folder of the script:
     cd numbers
     uv run --no-project --with numpy --with scipy python chain_table.py
     uv run --no-project --with numpy --with scipy --with cvxpy python optimal_schemes.py
+    uv run --no-project --with numpy --with scipy --with cvxpy python least_values.py
 
 Without uv: install the packages and run "python <script>.py" from the folder of the script. The scripts
 import a module of their own folder (style.py, chain3.py or cosim.py), so they must be run from that folder
 and without the option -I of Python. If cvxpy has no binary package for the newest Python, choose an earlier
 one (with uv: add --python 3.14). Every script runs in a few seconds, except optimal_schemes.py, which takes
-about one minute. No script reads or writes a file other than the PDFs in figures\out\.
+about one minute, and least_values.py, which takes a few minutes. No script reads or writes a file other than the PDFs in figures\out\.
 
 
 figures\
@@ -113,6 +115,16 @@ two_mass_ports.py       two-mass oscillator in four partitions: growth rates of 
                         with and without the gains K_i; conservation of the energy       0.50 H^2 in the example "the chain of three
                         with two displacements; alternating order; f_1 with force        stores"
                         and displacement
+least_values.py         the least values over all schemes to leading order, from the      lemma "the reach of the coefficients" and
+                        convex programmes over the reach of the coefficients: least      what follows: proposition "least one-step
+                        one-step error on the chain (every order) and the star; the      error" (3/4, 1.06); example "the chain of
+                        same without injection on the chain; least spread on the         three stores"; theorem "the amount" and the
+                        chain and on stars with 3 to 6 leaves; least injection with      star with m leaves (1.5, 1, m/2); example
+                        partner weights only (chain, star, ring of four); largest        "the chain of three, by order of execution"
+                        energy over a run on the lossless chain; least error over a      (2 alpha_*); remark after "the reaction"
+                        run on the chain against the zero-order holds                    (twice); section "Energy stored and energy
+                                                                                         created" (1.15); the display after the
+                                                                                         theorem "order barrier" (0.16, 0.33 to 0.35)
 
 
 Global optima and results of a local search (optimal_schemes.py)

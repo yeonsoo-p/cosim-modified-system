@@ -115,8 +115,8 @@ variable {E Ei : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
   {ι : Type*} [Fintype ι] {Y : ι → Type*} [∀ k, NormedAddCommGroup (Y k)]
   [∀ k, NormedSpace ℝ (Y k)]
 
-/-- **The states not shown to the subsystem** (the paper, Definition 4.1): its own state vanishes and
-so does every sample that it would be shown. -/
+/-- **The states not shown to the subsystem** (the paper, Definition 4.1): its own state vanishes
+and so does every sample that it would be shown. -/
 def notShown (Pr : E →L[ℝ] Ei) (N : ∀ k, E →L[ℝ] Y k) : Submodule ℝ E :=
   LinearMap.ker (Pr : E →ₗ[ℝ] Ei) ⊓ ⨅ k, LinearMap.ker (N k : E →ₗ[ℝ] Y k)
 

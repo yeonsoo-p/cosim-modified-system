@@ -13,7 +13,7 @@ that computes the numbers and draws the figures of the paper.
 
 | Folder | What it is |
 |---|---|
-| `lean/` | The library `CoSimFoundations` (101 modules) and its axiom audit |
+| `lean/` | The library `CoSimFoundations` (119 modules) and its axiom audit |
 | `lean/CORRESPONDENCE.txt` | Statement of the paper → Lean declarations, with a status for each |
 | `lean/SCOPE.txt` | The standard of the formalisation and the list of what is outside it |
 | `python/figures/` | One script per figure of the paper |
@@ -25,7 +25,7 @@ that computes the numbers and draws the figures of the paper.
 - The library imports Mathlib and nothing else.
 - It contains no `sorry`, and every audited theorem depends only on the three standard axioms of
   Lean: `propext`, `Classical.choice` and `Quot.sound`. The file `lean/CoSimFoundationsAudit.lean`
-  runs `#print axioms` on all 1,649 public theorems by their fully qualified names; the build
+  runs `#print axioms` on all 2,087 public theorems by their fully qualified names; the build
   prints the result for each.
 - Statements that the paper makes to leading order in the macro step are formalised at one macro
   step with an explicit bound on the remainder. `lean/SCOPE.txt` says in which form, and lists the

@@ -207,9 +207,9 @@ theorem det_infoStep_gs (stage : ι → ℕ) (hinj : Function.Injective stage) (
   exact Finset.prod_congr rfl fun i _ => by rw [det_toSquareBlock_id, diagonal_apply_eq]
 
 open scoped Matrix.Norms.Operator in
-/-- **Total damping in Gauss–Seidel mode** (the paper, Proposition 6.2, for scalar stores, every order
-of execution and full access): if the one-step map has a modified system, `X = exp (H • Ã)`, and
-the local coefficients are positive, then `H · tr Ã = Σ log (F i)`, whatever the sample
+/-- **Total damping in Gauss–Seidel mode** (the paper, Proposition 6.2, for scalar stores, every
+order of execution and full access): if the one-step map has a modified system, `X = exp (H • Ã)`,
+and the local coefficients are positive, then `H · tr Ã = Σ log (F i)`, whatever the sample
 coefficients are. With `F i = e^{λ_i H}` this is `ScalarNet.trace_modified_gs`. -/
 theorem trace_modified_infoStep_gs (stage : ι → ℕ) (hinj : Function.Injective stage) (F : ι → ℝ)
     (hF : ∀ i, 0 < F i) (G : Matrix ι ι ℝ) (hG : ∀ i, G i i = 0) (H : ℝ) (At : Matrix ι ι ℝ)
@@ -258,9 +258,9 @@ theorem infoStep_mul_output (sub : ι → α) (subO : κ → α) (stage : α →
       (1 - outNew sub subO stage G * C)⁻¹ * (K + (G - outNew sub subO stage G) * C) := by
   rw [infoStep, infoOld, infoNew_mul_output sub subO stage G C hC, Matrix.sub_mul]
 
-/-- **Gauss–Seidel mode with output maps** (the paper, Proposition 6.2, first sentence, in the form of
-equation (5)): subsystems with pairwise different stages, `K` block diagonal, block diagonal output
-maps `C`, and no coefficient on a subsystem's own outputs. Then
+/-- **Gauss–Seidel mode with output maps** (the paper, Proposition 6.2, first sentence, in the form
+of equation (5)): subsystems with pairwise different stages, `K` block diagonal, block diagonal
+output maps `C`, and no coefficient on a subsystem's own outputs. Then
 `det ((1 - G^new C)⁻¹ (K + G^old C)) = ∏_a det K_a`. -/
 theorem det_infoStep_output [Fintype α] [DecidableEq α] (sub : ι → α) (subO : κ → α)
     (stage : α → ℕ) (hinj : Function.Injective stage) (K : Matrix ι ι ℝ) (G : Matrix ι κ ℝ)

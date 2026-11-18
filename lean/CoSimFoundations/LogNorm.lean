@@ -110,8 +110,8 @@ theorem norm_defect_sub_one_le_kappa (At A : E →L[ℝ] E) {H c₁ c₂ : ℝ} 
           mul_le_mul_of_nonneg_left hτ.2 hm0]
 
 /-- **Accuracy against the difference with a constant of the reference alone:**
-`α ≤ H ‖Δ‖ · e^{H (g + ‖Δ‖)₊}`, where `g = a + b`, `a = -λ_min R`, `b = λ_max R` is the spread of the
-reference's dissipation. No assumption on the scheme. -/
+`α ≤ H ‖Δ‖ · e^{H (g + ‖Δ‖)₊}`, where `g = a + b`, `a = -λ_min R`, `b = λ_max R` is the spread of
+the reference's dissipation. No assumption on the scheme. -/
 theorem norm_defect_sub_one_le_reference (At A : E →L[ℝ] E) {H a b : ℝ} (hH : 0 ≤ H)
     (hlow : ∀ x, ⟪x, A x⟫ ≤ a * ‖x‖ ^ 2) (hup : ∀ x, -⟪x, A x⟫ ≤ b * ‖x‖ ^ 2) :
     ‖exp (H • At) * exp (H • (-A)) - 1‖ ≤

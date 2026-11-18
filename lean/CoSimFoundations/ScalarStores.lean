@@ -5,8 +5,8 @@ From a scheme to its step matrix: networks of scalar stores, Jacobi mode, one he
 A scalar store `ẋ = a x + b u`, `y = c x`, driven during one macro step by `u = v + k y` with a
 constant `v` (the held samples of its partners, weighted) and a local gain `k`, obeys
 `ẋ = λ x + b v`, `λ = a + b k c`, and after the step `x(H) = e^{λH} x(0) + g(λ, H) · b v` with
-`g(λ, H) = (e^{λH} - 1)/λ` (`= H` for `λ = 0`). Hence the step matrix of a Jacobi scheme with weights
-`w` and gains `k`:
+`g(λ, H) = (e^{λH} - 1)/λ` (`= H` for `λ = 0`). Hence the step matrix of a Jacobi scheme with
+weights `w` and gains `k`:
 
   `X i i = e^{λ_i H}`,   `X i j = g(λ_i, H) · b_i · w i j · c_j`  (`j ≠ i`).
 

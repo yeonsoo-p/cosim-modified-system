@@ -6,17 +6,17 @@ SCOPE of the formalisation: the standard, the form of the statements, and what i
 
 The library CoSimFoundations is written in Lean 4, toolchain leanprover/lean4:v4.35.0
 (file lean-toolchain), with Mathlib at the tag v4.35.0, commit
-56a005855ea17e0b0958f73ec801ae140b0a1679 (file lake-manifest.json). It has 101 modules in the folder
-CoSimFoundations, with 1,654 theorems and 214 definitions and structures in 31,451 lines; the root
+56a005855ea17e0b0958f73ec801ae140b0a1679 (file lake-manifest.json). It has 119 modules in the folder
+CoSimFoundations, with 2,092 theorems and 296 definitions and structures in 43,108 lines; the root
 file CoSimFoundations.lean imports all of them. The library imports Mathlib and nothing else: every
-import line of the 101 modules, of the root file and of the audit file names a module of Mathlib or
-of the library itself. It contains no unproved step and declares no axiom: a search of these 103
+import line of the 119 modules, of the root file and of the audit file names a module of Mathlib or
+of the library itself. It contains no unproved step and declares no axiom: a search of these 121
 files for the words sorry, admit, native_decide, axiom, unsafe, opaque, implemented_by, extern and
 set_option, as whole words in code and comments, finds none of them. The library is compiled with
 autoImplicit switched off and with warnings treated as errors (lakefile.toml), so that a declaration
 that uses sorry would stop the build.
 
-The audit. CoSimFoundationsAudit.lean imports the library and consists of 1,649 lines of the form
+The audit. CoSimFoundationsAudit.lean imports the library and consists of 2,087 lines of the form
 "#print axioms CoSimFoundations.name", one for each public theorem by its fully qualified name. When
 the file is built, Lean prints for each of them the axioms on which its proof depends, through all
 lemmas that it uses. The standard is met if the build ends without an error and every printed list
@@ -51,17 +51,27 @@ statements about it are formalised for ||X - I|| <= 1/3 and H ||A|| <= 1/4.
 The following hypotheses, which the paper leaves to its standing assumptions, are explicit in the
 Lean statements: an invertible phi in (10) and wherever Psi_0, E or Q occur
 (proved for H ||A_0|| <= 1); H != 0 or H > 0 where a statement divides by H; integer offsets in
-(16); surjective outputs of the partners, given by right inverses, in (23); in Theorem 4.4 (i), in
-Theorem 4.5 (i) and in (42) a bounded right inverse of the stacked maps, on which the constants
+(16); surjective outputs of the partners, given by right inverses, in (24); in Theorem 4.5 (i), in
+Theorem 4.6 (i) and in (45) a bounded right inverse of the stacked maps, on which the constants
 depend, with H ||A_i|| <= 1 and a smallness condition on H times the norm of that inverse, and
-H <= 1 in the last two; in Theorem 4.5 (ii) the constant 2 b of Lemma A.1 in the place of 5.3;
+H <= 1 in the last two; in Theorem 4.6 (ii) the constant 2 b of Lemma A.1 in the place of 5.3;
 0 <= H and l >= 1 in Lemma A.1; distinct stages for the determinant of Proposition 5.1; B and L
-given as data in the form of (31) at the ports, which holds for every interconnection L; that a
+given as data in the form of (33) at the ports, which holds for every interconnection L; that a
 subsystem is not its own partner in the statements on a diagonal block. The injection rate and the
 added damping enter as arbitrary bounds of the quadratic form of Delta_R and not as eigenvalues. The
-largest relative error of Theorem 4.5 and Lemma A.1 enters as an arbitrary upper bound of the
+largest relative error of Theorem 4.6 and Lemma A.1 enters as an arbitrary upper bound of the
 relative errors of all runs. The asymptotic part of Corollary 3.4 is stated as a condition on the
-eigenvalues.
+eigenvalues. Further: in Lemma 3.7 and what follows from it, the outputs through a block-diagonal
+projection onto the kernels of the output maps; in (32) any T with T ||A|| <= 1/2, with one held
+sample a start from the initial state, and with more held samples Jacobi schemes under (ii) with
+bounded weights on the past samples; in Proposition 5.5 a leading defect in D_l + Z_l, which the
+library proves for these Jacobi schemes; for the largest order in every case the stacked rules of
+all subsystems at one macro step; for the least values with partner weights only the class of
+coefficients F_i = exp(H A_i) with arbitrary coefficients of the samples; for the largest energy
+over a run in Section 5.4 an angle that is an irrational multiple of pi, proved at h = 1/10. Every
+least value with one held sample is stated from both sides: a bound for every scheme and a scheme
+that attains it, with explicit remainders; with more held samples the parts that CORRESPONDENCE.txt
+lists as not formalised are missing.
 
 -------------------------------- What is outside the formalisation ---------------------------------
 
@@ -83,20 +93,24 @@ only.
     library has no Jordan form. In Corollary 3.5: that the eigenvalues of the modified system are
     even in H.
   - Section 4. In Theorem 4.2: the identity T_i v = Pi_i U v on the states not shown as a
-    declaration of its own (its consequence for the norm is formalised). (24) for subsystems with
-    more than one state. Example 4.3. (26) on the states that a subsystem is shown. In Theorem 4.4
-    (ii): the printed form, which follows from the formalised one by a division. In Theorem 4.5: the
-    last sentence, on one held sample, as one statement.
+    declaration of its own (its consequence for the norm is formalised). (25) for subsystems with
+    more than one state. Example 4.4. (27) on the states that a subsystem is shown, so that the
+    order l of Theorem 4.6 is reached by a rule constructed for it and not by polynomial
+    extrapolation. In Theorem 4.5 (ii): the printed form, which follows from the formalised one by a
+    division. In Theorem 4.6: the last sentence, on one held sample, as one statement.
   - Section 5. In Proposition 5.1: the determinant, and nu = 0, when two subsystems that are not
-    partners share a stage. In Lemma 5.2: that equality holds in (34) for one pair, and that a pair
+    partners share a stage. In Lemma 5.2: that equality holds in (36) for one pair, and that a pair
     in the state spaces of two subsystems attains the norm of the block. In Corollary 5.4 (ii): the
     characterisation by proper interval graphs, which rests on a cited theorem of graph theory; the
-    path executed from end to end is formalised. In Proposition 5.5: Delta_R = 0 and that the
-    difference is a numerical interconnection, for ||X - I|| > 1/3. Example 5.6. In Proposition 5.7:
-    the size O(H^3 |x^k|^2) of the term with skew Psi_0, its vanishing when some A_i are symmetric
-    and others skew, and that the second term of (37) is absent only if no two partners share a
-    stage.
-  - Section 6. In Proposition 6.1: the two inequalities that follow (38). Example 6.2, Example 6.3.
+    path executed from end to end is formalised. In Proposition 5.6: Delta_R = 0 and that the
+    difference is a numerical interconnection, for ||X - I|| > 1/3. The values of Example 5.7 at
+    h = 0.1. In Theorem 5.3: the equality in (37) for disjoint forced pairs as a statement about
+    schemes (formalised for the matrices). In Proposition 5.8: the size O(H^3 |x^k|^2) of the term
+    with skew Psi_0, its vanishing when some A_i are symmetric and others skew, and that the second
+    term of (40) is absent only if no two partners share a stage.
+  - Section 6. In Proposition 6.1: the two inequalities that follow (41); after it, the realisation
+    of the least values with partner weights by bounded weight functions, and their values on the
+    groups for lossless subsystems whose outputs hide states. Example 6.2, Example 6.3.
 
 Statements of the running text have a row in CORRESPONDENCE.txt where the library has a declaration
 for them. Of the running text, the following are outside the formalisation.
@@ -124,7 +138,12 @@ for them. Of the running text, the following are outside the formalisation.
   - Section 5.2: that the largest entry of Delta_R between two orthogonal states attains half the
     spread mu + iota; tau_k = (p_i - 2 p_k + p_j)/2 with offsets; that A_ik A_kj vanishes if the two
     ports of the common partner act in orthogonal directions.
-  - Section 5.3: the star with three leaves and the ring; the damped sweep as a splitting.
+  - Section 5.3: the least trace for the star, and that the hub entries of the star lie in the reach
+    (the least spread over the leaves is formalised); after Proposition 5.5, that on a chain a
+    subsystem is shown exactly the stores fewer than l + 1 links away, and the least spread on the
+    chain of four with two held samples; the damped sweep as a splitting.
+  - Section 4.1: for the star with three leaves, the step from the leaves to the whole matrix in the
+    least one-step error.
   - Section 5.4: x^T A_seq x at the ports; the modified Hamiltonian of the symplectic Euler method
     for two stores; N + N^T = H A_seq for the zero-order hold, which the bound (1 + rho)/(1 - rho)
     on the energy needs; the threshold H lambda_max(A_seq) = 2; the statement on coupling graphs
@@ -132,6 +151,6 @@ for them. Of the running text, the following are outside the formalisation.
   - Section 7.1: that a Jacobi scheme with the first-order input has X - U = O(H^3).
   - Appendix A.3: skew Psi_0 = (1/12) H^2 skew(A_0^2) + O(H^4).
 
-Example 2.3, Example 4.3, Example 5.6, Example 6.2, Example 6.3, the numbers of the two tables and
-the numbers of the figures are computed, not proved; the code that computes them is published with
-the library.
+Example 2.3, Example 4.4, Example 6.2, Example 6.3, the values of Example 5.7 at h = 0.1, the
+numbers of the two tables and the numbers of the figures are computed, not proved; the code that
+computes them is published with the library.
